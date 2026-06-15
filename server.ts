@@ -511,7 +511,7 @@ app.post("/api/auth/login", async (req, res) => {
   return res.status(401).json({ error: "Invalid username or password" });
 });
 
-// 1.1. Secure Face Key Biometric Registration
+// 1.1. Secure Face Key Biometric Registration with Enforced Face Uniqueness Check
 app.post("/api/auth/register-face", async (req, res) => {
   const weddingId = req.headers["x-wedding-id"] as string;
   const { faceImage } = req.body;
@@ -524,6 +524,108 @@ app.post("/api/auth/register-face", async (req, res) => {
   }
 
   try {
+    const ai = getGeminiClient();
+    
+    // Check face uniqueness constraint against all other registered accounts
+    let otherCandidates: DBWedding[] = [];
+    if (usePostgres) {
+      const qRes = await pool.query(
+        "SELECT * FROM weddings WHERE id <> $1 AND face_login_image IS NOT NULL AND face_login_image <> ''",
+        [weddingId]
+      );
+      otherCandidates = qRes.rows.map(mapWeddingRow);
+    } else {
+      const db = loadDatabase();
+      otherCandidates = db.weddings.filter((w) => w.id !== weddingId && w.faceLoginImage);
+    }
+
+    if (ai && otherCandidates.length > 0) {
+      const newParsed = extractBase64(faceImage);
+      if (newParsed) {
+        const targetPart = {
+          inlineData: {
+            mimeType: newParsed.mimeType,
+            data: newParsed.data,
+          }
+        };
+
+        const contentParts: any[] = [
+          {
+            text: "FACIAL BIOMETRIC REGISTER UNIQUENESS CHECK TASK.\n" +
+                  "Compare the client's uploaded face snapshot (Query Face) to the registered facial biometric keys (Other Candidates) below.\n" +
+                  "We want to enforce that NO other wedding account in the system is registered with the exact same physical face.\n" +
+                  "Focus on cranial structure, pupil spacing, nose bridge contours, jawline shape and facial proportions.\n" +
+                  "If you find ANY candidates representing the SAME physical person with high matching confidence >= 85%, report them as a match."
+          },
+          { text: "Query Face (New Face attempting to register):" },
+          targetPart
+        ];
+
+        otherCandidates.forEach((cand) => {
+          const candParsed = extractBase64(cand.faceLoginImage || "");
+          if (candParsed) {
+            contentParts.push({ text: `Candidate Account ID: "${cand.id}" (Couple description: @${cand.username})` });
+            contentParts.push({
+              inlineData: {
+                mimeType: candParsed.mimeType,
+                data: candParsed.data,
+              }
+            });
+          }
+        });
+
+        contentParts.push({
+          text: "Check if the newly submitted Query Face matches any of the other physical identities. Output response STRICTLY in this JSON format:\n" +
+                "{\n" +
+                "  \"matches\": [\n" +
+                "    {\n" +
+                "      \"weddingId\": \"the matched candidate's Wedding ID\",\n" +
+                "      \"confidence\": number_between_0_and_100,\n" +
+                "      \"isMatch\": boolean\n" +
+                "    }\n" +
+                "  ]\n" +
+                "}\n" +
+                "If it does not match anyone, output an empty matches array []."
+        });
+
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: contentParts,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                matches: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      weddingId: { type: Type.STRING },
+                      confidence: { type: Type.INTEGER },
+                      isMatch: { type: Type.BOOLEAN },
+                    },
+                    required: ["weddingId", "confidence", "isMatch"],
+                  }
+                }
+              },
+              required: ["matches"]
+            }
+          }
+        });
+
+        const text = response.text || "{}";
+        const parsed = JSON.parse(text.trim());
+        const duplicates = (parsed.matches || []).filter((m: any) => m.isMatch && m.confidence >= 85);
+
+        if (duplicates.length > 0) {
+          return res.status(400).json({
+            error: "Biometric Conflict: This face is already linked to a different registered couple account! To maintain strict security, each user must register a unique facial key."
+          });
+        }
+      }
+    }
+
     if (usePostgres) {
       const result = await pool.query(
         "UPDATE weddings SET face_login_image = $1 WHERE id = $2 RETURNING *",
@@ -607,12 +709,11 @@ app.post("/api/auth/login-by-face", async (req, res) => {
 
     const contentParts: any[] = [
       { 
-        text: "SECURE BIOMETRIC IDENTITY LOOKUP TASK.\n" +
-              "Compare the query screen snapshot (Query Face) against the registered facial biometric keys (Candidate Keys) below.\n" +
-              "Analyze facial structures, key bone indices, ocular ratios, temple width, nose bridge line shape, and overall chin curvature.\n" +
-              "Ignore changes in light, haircut, posture, and facial expressions.\n" +
-              "Find the single candidate key that matches the Query Face with a high level of confidence above 88%.\n" +
-              "Output the response strictly inside the JSON match template format specified."
+        text: "SECURE HIGH-PRECISION WEDDING ACCOUNT BIOMETRIC IDENTITY LOOKUP TASK.\n" +
+              "Compare the query snapshot (Query Face) with the registered couple accounts biometrics below.\n" +
+              "Focus intently on core cranial features, pupil spacing, nose bridge contours, jawline shape, and facial proportions.\n" +
+              "Ignore changes in light, haircut, posture, camera resolution, or accessories.\n" +
+              "Find any accounts representing the exact same physical individual with matching confidence of 85% or higher."
       },
       { text: "Query Face (Scanned Login Attempt):" },
       targetPart,
@@ -633,12 +734,17 @@ app.post("/api/auth/login-by-face", async (req, res) => {
     });
 
     contentParts.push({
-      text: `Select the best matching Candidate Wedding ID. Output STRICTLY this JSON schema:
-{
-  "bestMatchId": "the winning Candidate Wedding ID string, or null if no candidate qualifies with confidence larger than 88%",
-  "confidence": number_between_0_and_100,
-  "isMatchMatched": boolean
-}`
+      text: "Analyze each potential wedding account match carefully and rank them. Output your response STRICTLY as a JSON object of this structure:\n" +
+            "{\n" +
+            "  \"matches\": [\n" +
+            "    {\n" +
+            "      \"weddingId\": \"the candidate's exact Wedding ID string, e.g. wedding-123\", \n" +
+            "      \"confidence\": number_between_0_and_100, \n" +
+            "      \"isMatch\": boolean\n" +
+            "    }\n" +
+            "  ]\n" +
+            "}\n" +
+            "If absolutely no registered accounts match this face, output an empty array [] for matches."
     });
 
     const response = await ai.models.generateContent({
@@ -649,11 +755,20 @@ app.post("/api/auth/login-by-face", async (req, res) => {
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            bestMatchId: { type: Type.STRING, nullable: true },
-            confidence: { type: Type.INTEGER },
-            isMatchMatched: { type: Type.BOOLEAN },
+            matches: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  weddingId: { type: Type.STRING },
+                  confidence: { type: Type.INTEGER },
+                  isMatch: { type: Type.BOOLEAN },
+                },
+                required: ["weddingId", "confidence", "isMatch"],
+              },
+            },
           },
-          required: ["bestMatchId", "confidence", "isMatchMatched"],
+          required: ["matches"],
         },
       },
     });
@@ -661,8 +776,13 @@ app.post("/api/auth/login-by-face", async (req, res) => {
     const text = response.text || "{}";
     const parsed = JSON.parse(text.trim());
 
-    if (parsed.isMatchMatched && parsed.bestMatchId) {
-      const matchedWedding = candidates.find(c => c.id === parsed.bestMatchId);
+    const finalMatches = (parsed.matches || [])
+      .filter((m: any) => m.isMatch && m.confidence >= 85)
+      .sort((a: any, b: any) => b.confidence - a.confidence);
+
+    if (finalMatches.length > 0) {
+      const matchedId = finalMatches[0].weddingId;
+      const matchedWedding = candidates.find(c => c.id === matchedId);
       if (matchedWedding) {
         return res.json({
           token: `wedding-token-${matchedWedding.id}`,
@@ -672,12 +792,12 @@ app.post("/api/auth/login-by-face", async (req, res) => {
           weddingName: matchedWedding.weddingName,
           profilePicture: matchedWedding.profilePicture,
           faceLoginImage: matchedWedding.faceLoginImage || null,
-          message: "Biometrics verified"
+          message: "Biometrics verified successfully"
         });
       }
     }
 
-    return res.status(401).json({ error: "Access denied: Facial biometrics did not match any registered credentials. Please ensure your face is well-lit and try again!" });
+    return res.status(401).json({ error: "Access denied: Facial biometrics did not match any registered wedding accounts. Please ensure your face is well-lit and try again!" });
 
   } catch (error: any) {
     console.error("Biometric lookup failure:", error);

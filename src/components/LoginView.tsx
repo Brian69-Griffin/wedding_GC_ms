@@ -135,16 +135,16 @@ export default function LoginView({
   const captureAndAuthenticateFace = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
-      canvas.width = 360;
-      canvas.height = 360;
+      canvas.width = 260;
+      canvas.height = 260;
       const ctx = canvas.getContext("2d");
       if (ctx) {
         if (cameraFacing === "user") {
           ctx.scale(-1, 1);
-          ctx.translate(-360, 0);
+          ctx.translate(-260, 0);
         }
-        ctx.drawImage(videoRef.current, 0, 0, 360, 360);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85); // Compress JPEG for efficient bandwidth
+        ctx.drawImage(videoRef.current, 0, 0, 260, 260);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.75); // Lighter payload for split-second processing
         setFacePhoto(dataUrl);
         stopFaceCamera();
         
