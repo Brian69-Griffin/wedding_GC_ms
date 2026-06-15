@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Heart, Lock, User, Sparkles, Eye, EyeOff, Shield, Smile, X, Camera } from "lucide-react";
+import { Heart, Lock, User, Eye, EyeOff, Shield, Smile, X, Camera } from "lucide-react";
 import { SecurityUser } from "../types";
 import { Language, translations } from "../i18n";
 
@@ -31,11 +31,35 @@ export default function LoginView({
   const [faceError, setFaceError] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
   const [faceScanProgress, setFaceScanProgress] = useState(0);
+  const [facePresent, setFacePresent] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const facePresentRef = useRef(true);
 
   const t = translations[lang];
+
+  useEffect(() => {
+    facePresentRef.current = facePresent;
+  }, [facePresent]);
+
+  // Periodic Face Presence Detection Loop for Login
+  useEffect(() => {
+    let checkInterval: any = null;
+    if (faceModalOpen && cameraActive && !faceScanning && !facePhoto) {
+      checkInterval = setInterval(() => {
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          const isPresent = checkRealFacePresence(videoRef.current);
+          setFacePresent(isPresent);
+        }
+      }, 250);
+    } else {
+      setFacePresent(true);
+    }
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+    };
+  }, [faceModalOpen, cameraActive, faceScanning, facePhoto]);
 
   // Auto-sweep scanning execution when biometric view open
   useEffect(() => {
@@ -44,6 +68,10 @@ export default function LoginView({
       setFaceScanProgress(0);
       timer = setInterval(() => {
         setFaceScanProgress((prev) => {
+          // If face is NOT present, do NOT advance or progress scanning
+          if (!facePresentRef.current) {
+            return prev;
+          }
           if (prev >= 100) {
             clearInterval(timer);
             // Grab the frame automatically on full sweep completion!
@@ -233,13 +261,13 @@ export default function LoginView({
 
       <div className={`w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl transition-all duration-300 ${
         isNightMode 
-          ? "bg-black/45 border-amber-500/20 shadow-amber-950/20 text-white" 
+          ? "bg-black/45 border-amber-500/20 shadow-amber-955/20 text-white" 
           : "bg-white border-rose-100 shadow-rose-100/50 text-gray-900"
       }`}>
         {/* Banner with lucky red/gold styling */}
         <div className={`relative p-8 text-center text-white bg-gradient-to-br transition-all ${
           isNightMode 
-            ? "from-[#1a0000] via-rose-950 to-amber-950 border-b border-amber-500/20" 
+            ? "from-[#1a0000] via-rose-955 to-amber-955 border-b border-amber-500/20" 
             : "from-rose-800 to-rose-950"
         }`}>
           <div className="absolute top-2 right-2 opacity-10">
@@ -259,7 +287,7 @@ export default function LoginView({
           {error && (
             <div className={`mb-4 rounded-lg p-3 text-xs font-medium border ${
               isNightMode 
-                ? "bg-red-500/10 border-red-505/20 text-red-400" 
+                ? "bg-red-500/10 border-red-505/20 text-red-100" 
                 : "bg-rose-50 border-rose-100 text-rose-600"
             }`}>
               {error}
@@ -272,7 +300,7 @@ export default function LoginView({
                 {t.usernameLabel}
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-550">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
                   <User size={16} />
                 </span>
                 <input
@@ -296,7 +324,7 @@ export default function LoginView({
                 {t.password}
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-555">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
                   <Lock size={16} />
                 </span>
                 <input
@@ -330,7 +358,7 @@ export default function LoginView({
               className={`mt-6 w-full rounded-xl py-3 font-medium transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer text-sm font-bold shadow-lg ${
                 isNightMode 
                   ? "bg-gradient-to-r from-amber-500 to-[#b57c1e] text-rose-955 shadow-amber-900/10" 
-                  : "bg-gradient-to-r from-rose-700 to-rose-900 text-white shadow-rose-950/25"
+                  : "bg-gradient-to-r from-rose-700 to-rose-900 text-white shadow-rose-955/25"
               }`}
             >
               {loading ? (lang === "kh" ? "កំពុងផ្ទៀងផ្ទាត់..." : "Authenticating Digital Lock...") : t.enterCeremony}
@@ -367,11 +395,11 @@ export default function LoginView({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-md">
           <div className={`w-full max-w-sm overflow-hidden rounded-2xl border shadow-2xl transition-all ${
             isNightMode 
-              ? "bg-[#0b0101] border-amber-500/20 text-white shadow-amber-950/30" 
-              : "bg-white border-rose-150 text-gray-900 shadow-rose-100/50"
+              ? "bg-[#0b0101] border-amber-500/20 text-white shadow-amber-955/35" 
+              : "bg-white border-rose-100 text-gray-900 shadow-rose-100/50"
           }`}>
             <div className={`flex items-center justify-between p-4 text-white ${
-              isNightMode ? "bg-stone-950 border-b border-amber-500/10" : "bg-gradient-to-r from-rose-800 to-rose-950"
+              isNightMode ? "bg-stone-955 border-b border-amber-500/10" : "bg-gradient-to-r from-rose-800 to-rose-955"
             }`}>
               <div className="flex items-center gap-2">
                 <Shield className="text-amber-400 animate-pulse" size={16} />
@@ -382,7 +410,7 @@ export default function LoginView({
               <button
                 type="button"
                 onClick={closeFaceModal}
-                className="rounded-lg p-1 transition-all hover:bg-white/15 text-white/80 cursor-pointer"
+                className="rounded-lg p-1 transition-all hover:bg-white/14 text-white/80 cursor-pointer"
               >
                 <X size={15} />
               </button>
@@ -391,7 +419,7 @@ export default function LoginView({
             <div className="p-6 flex flex-col items-center">
               {faceError && (
                 <div className={`w-full mb-4 rounded-xl p-3 text-xs font-semibold border ${
-                  isNightMode ? "bg-red-950/30 border-red-900/30 text-red-450" : "bg-rose-50 border-rose-100 text-rose-700"
+                  isNightMode ? "bg-red-955/30 border-red-900/30 text-red-100" : "bg-rose-50 border-rose-100 text-rose-700"
                 }`}>
                   {faceError}
                 </div>
@@ -437,35 +465,43 @@ export default function LoginView({
                     ref={videoRef} 
                     className="w-full h-full object-cover scale-x-[-1]" 
                     playsInline 
-                    muted 
+                    autoPlay
                   />
                 ) : facePhoto ? (
                   <img 
                     src={facePhoto} 
-                    alt="Scanned look" 
-                    className="w-full h-full object-cover animate-pulse" 
+                    alt="Captured biometric" 
+                    className="w-full h-full object-cover scale-x-[-1]" 
                   />
                 ) : (
-                  <div className="text-gray-500 text-[10px] uppercase font-bold text-center p-4">
-                    {lang === "kh" ? "កាមេរ៉ាកំពុងដំណើរការ..." : "Accessing optics..."}
+                  <div className="text-gray-650 flex flex-col items-center">
+                    <Camera size={36} className="animate-pulse" />
                   </div>
                 )}
               </div>
 
               {/* Biometric Scan status pill */}
               <div className={`mb-4 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase flex items-center gap-1.5 ${
-                isNightMode ? "bg-amber-955/50 border border-amber-500/10 text-amber-300 animate-pulse" : "bg-rose-50 border border-rose-100 text-rose-900"
+                !facePresent
+                  ? "bg-red-955/40 text-red-400 border border-red-900/30 animate-pulse"
+                  : isNightMode 
+                  ? "bg-amber-955/52 border border-amber-500/10 text-amber-300 animate-pulse" 
+                  : "bg-rose-50 border border-rose-100 text-rose-900"
               }`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping" />
+                <span className={`h-1.5 w-1.5 rounded-full ${!facePresent ? "bg-red-500 animate-pulse" : "bg-emerald-600 animate-ping"}`} />
                 <span>
-                  {lang === "kh" ? `កម្រិតស្កែន៖ ${faceScanProgress}%` : `BIOMETRIC PROGRESS: ${faceScanProgress}%`}
+                  {!facePresent
+                    ? (lang === "kh" ? "ការស្កែនផ្អាក" : "SCAN PAUSED")
+                    : (lang === "kh" ? `កម្រិតស្កែន៖ ${faceScanProgress}%` : `BIOMETRIC PROGRESS: ${faceScanProgress}%`)}
                 </span>
               </div>
 
               <p className={`text-center text-xs font-semibold mb-6 max-w-xs ${
-                isNightMode ? "text-amber-200/90" : "text-rose-950"
+                !facePresent ? "text-red-500 animate-pulse" : isNightMode ? "text-amber-200/90" : "text-rose-955"
               }`}>
-                {faceScanning 
+                {!facePresent
+                  ? (lang === "kh" ? "⚠️ សូមដាក់ផ្ទៃមុខចូលក្នុងកាមេរ៉ា ដើម្បីបន្តការស្កែន" : "⚠️ Please position your face inside the focal ring to scan")
+                  : faceScanning 
                   ? (lang === "kh" ? "📡 ម៉ាស៊ីនបម្រើកំពុងផ្ទៀងផ្ទាត់ទិន្នន័យ..." : "📡 Matchmaking biometric registry keys...") 
                   : faceScanProgress < 30 
                   ? (lang === "kh" ? "🔍 កំពុងតម្រង់ទម្រង់ផ្ទៃមុខ..." : "🔍 Tracking facial profile dimensions...")
@@ -495,4 +531,98 @@ export default function LoginView({
       )}
     </div>
   );
+}
+
+// Fast real-time computer vision presence analyzer for face scanning
+function checkRealFacePresence(video: HTMLVideoElement): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 30;
+    canvas.height = 30;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return true;
+
+    ctx.drawImage(video, 0, 0, 30, 30);
+    const imgData = ctx.getImageData(0, 0, 30, 30);
+    const data = imgData.data;
+
+    let totalR = 0;
+    let totalG = 0;
+    let totalB = 0;
+
+    let centerSkinPixels = 0;
+    let centerTotalPixels = 0;
+    let outerSkinPixels = 0;
+    let outerTotalPixels = 0;
+
+    // Monitor luminance variation to reject flat backgrounds
+    let minLuminance = 255;
+    let maxLuminance = 0;
+
+    for (let y = 0; y < 30; y++) {
+      for (let x = 0; x < 30; x++) {
+        const i = (y * 30 + x) * 4;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        totalR += r;
+        totalG += g;
+        totalB += b;
+
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (luminance < minLuminance) minLuminance = luminance;
+        if (luminance > maxLuminance) maxLuminance = luminance;
+
+        // Classify skin tones in various ethnical profiles
+        const isSkin = r > 65 && g > 45 && b > 25 && r > g && r > b && (r - g) > 8;
+
+        // Center region represents the camera center aligned with the scanning overlay circle (X: 7..22, Y: 7..22)
+        const isCenter = x >= 7 && x <= 22 && y >= 7 && y <= 22;
+
+        if (isCenter) {
+          centerTotalPixels++;
+          if (isSkin) centerSkinPixels++;
+        } else {
+          outerTotalPixels++;
+          if (isSkin) outerSkinPixels++;
+        }
+      }
+    }
+
+    const count = data.length / 4;
+    const avgR = totalR / count;
+    const avgG = totalG / count;
+    const avgB = totalB / count;
+
+    const centerSkinRatio = centerSkinPixels / centerTotalPixels;
+    const outerSkinRatio = outerSkinPixels / outerTotalPixels;
+
+    // 1. Check if camera is covered (extremely low illumination or pitch dark)
+    if (avgR < 25 && avgG < 25 && avgB < 25) {
+      return false;
+    }
+
+    // 2. Reject flat, uniform surfaces (e.g. ceilings, flat sheets, plain light walls with zero shadows/features)
+    // A genuine face of a user has deep-contrast textures from eyelashes, eyes, nostrils, and hair
+    if (maxLuminance - minLuminance < 35) {
+      return false;
+    }
+
+    // 3. Central focus constraint (the user's physical face must cover the scanner ring area in the center)
+    if (centerSkinRatio < 0.15) {
+      return false;
+    }
+
+    // 4. Uniform background skin-tone rejection (e.g. warm wooden door frame, cabinetry, uniform beige wall)
+    // In a flat background, skin pixels are uniformly spread out (similar ratio in inner vs outer regions).
+    // In contrast, a centered face creates a notable spike/concentration in the focal center ring.
+    if (outerSkinRatio > 0.15 && centerSkinRatio < outerSkinRatio * 1.15) {
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    return true; // failure safe to avoid blocking client
+  }
 }

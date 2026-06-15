@@ -19,9 +19,16 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
   // Streamlined Automated Scanning States
   const [scanProgress, setScanProgress] = useState(0);
   const [activeStep, setActiveStep] = useState(0); // 0=center, 1=right, 2=left, 3=up, 4=down
+  const [facePresent, setFacePresent] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const facePresentRef = useRef(true);
+
+  // Sync state to ref to avoid restarting the scanning interval effect on toggle
+  useEffect(() => {
+    facePresentRef.current = facePresent;
+  }, [facePresent]);
 
   const steps = [
     { id: 0, textEn: "Center Face Position", textKh: "ដាក់ផ្ទៃមុខចំកណ្តាល" },
@@ -39,6 +46,24 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
     };
   }, []);
 
+  // Periodic Face Presence Detection Loop
+  useEffect(() => {
+    let checkInterval: any = null;
+    if (cameraActive && !success && !registering) {
+      checkInterval = setInterval(() => {
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          const isPresent = checkRealFacePresence(videoRef.current);
+          setFacePresent(isPresent);
+        }
+      }, 250); // check 4 times per second
+    } else {
+      setFacePresent(true);
+    }
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+    };
+  }, [cameraActive, success, registering]);
+
   // Automated step progression interval
   useEffect(() => {
     let interval: any = null;
@@ -48,6 +73,10 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
       
       interval = setInterval(() => {
         setScanProgress((prev) => {
+          // If no face is shown, pause scanning and do not progress
+          if (!facePresentRef.current) {
+            return prev;
+          }
           if (prev >= 100) {
             clearInterval(interval);
             // Instantly trigger automated screen grab!
@@ -288,11 +317,17 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
 
               {/* Progress counter pill */}
               <div className={`mb-4 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5 ${
-                isNightMode ? "bg-amber-950/40 text-amber-300 border border-amber-500/10" : "bg-rose-50 text-rose-900 border border-rose-100"
+                !facePresent
+                  ? "bg-red-950/40 text-red-400 border border-red-900/30 animate-pulse"
+                  : isNightMode 
+                  ? "bg-amber-955/40 text-amber-300 border border-amber-500/10" 
+                  : "bg-rose-50 text-rose-900 border border-rose-100"
               }`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-ping" />
+                <span className={`h-1.5 w-1.5 rounded-full ${!facePresent ? "bg-red-500 animate-pulse" : "bg-emerald-550 animate-ping"}`} />
                 <span>
-                  {lang === "kh" ? `កម្រិតស្កែន៖ ${scanProgress}%` : `BIOMETRIC PROGRESS: ${scanProgress}%`}
+                  {!facePresent
+                    ? (lang === "kh" ? "ការស្កែនផ្អាក" : "SCAN PAUSED")
+                    : (lang === "kh" ? `កម្រិតស្កែន៖ ${scanProgress}%` : `BIOMETRIC PROGRESS: ${scanProgress}%`)}
                 </span>
               </div>
 
@@ -312,8 +347,8 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
                           isCompleted 
                             ? (isNightMode ? "bg-amber-500/10 text-amber-400 border-amber-500/30 font-black scale-[0.98]" : "bg-emerald-50 text-emerald-800 border-emerald-100 font-bold scale-[0.98]")
                             : isActive 
-                            ? (isNightMode ? "bg-rose-950/30 text-rose-300 border-rose-800 scale-102 ring-1 ring-amber-400/50 animate-pulse" : "bg-rose-100 text-rose-950 border-rose-400 scale-102 font-bold ring-2 ring-rose-200")
-                            : (isNightMode ? "bg-stone-950/20 text-stone-600 border-stone-900" : "bg-gray-50 text-gray-400 border-gray-100")
+                            ? (isNightMode ? "bg-rose-955/40 text-rose-300 border-rose-800 scale-102 ring-1 ring-amber-450/50 animate-pulse" : "bg-rose-100 text-rose-950 border-rose-400 scale-102 font-bold ring-2 ring-rose-200")
+                            : (isNightMode ? "bg-stone-955/20 text-stone-600 border-stone-900" : "bg-gray-50 text-gray-400 border-gray-100")
                         }`}
                         title={lang === "kh" ? st.textKh : st.textEn}
                       >
@@ -332,14 +367,31 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
 
                 {/* Live Instruction text bar */}
                 <div className={`p-3 rounded-xl border text-center text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                  isNightMode ? "bg-black/60 border-amber-500/10 text-amber-200" : "bg-rose-50/50 border-rose-100 text-rose-950"
+                  !facePresent
+                    ? "bg-red-955/35 border-red-500/30 text-rose-300 animate-pulse"
+                    : isNightMode 
+                    ? "bg-black/60 border-amber-500/10 text-amber-200" 
+                    : "bg-rose-50/50 border-rose-100 text-rose-950"
                 }`}>
-                  <Sparkles size={13} className="text-amber-500 animate-spin" />
-                  <span>
-                    {lang === "kh" 
-                      ? `សកម្មភាព៖ ${steps[activeStep].textKh}` 
-                      : `Instruction: ${steps[activeStep].textEn}`}
-                  </span>
+                  {!facePresent ? (
+                    <>
+                      <span className="text-sm">⚠️</span>
+                      <span className="text-red-500 dark:text-red-400">
+                        {lang === "kh" 
+                          ? "សូមដាក់ផ្ទៃមុខចូលក្នុងកាមេរ៉ា (ផ្អាកការស្កែន)" 
+                          : "Reposition face in focal ring (Scan Paused)"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={13} className="text-amber-500 animate-spin" />
+                      <span>
+                        {lang === "kh" 
+                          ? `សកម្មភាព៖ ${steps[activeStep].textKh}` 
+                          : `Instruction: ${steps[activeStep].textEn}`}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -362,3 +414,98 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
     </div>
   );
 }
+
+// Fast real-time computer vision presence analyzer for face scanning
+function checkRealFacePresence(video: HTMLVideoElement): boolean {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 30;
+    canvas.height = 30;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return true;
+
+    ctx.drawImage(video, 0, 0, 30, 30);
+    const imgData = ctx.getImageData(0, 0, 30, 30);
+    const data = imgData.data;
+
+    let totalR = 0;
+    let totalG = 0;
+    let totalB = 0;
+
+    let centerSkinPixels = 0;
+    let centerTotalPixels = 0;
+    let outerSkinPixels = 0;
+    let outerTotalPixels = 0;
+
+    // Monitor luminance variation to reject flat backgrounds
+    let minLuminance = 255;
+    let maxLuminance = 0;
+
+    for (let y = 0; y < 30; y++) {
+      for (let x = 0; x < 30; x++) {
+        const i = (y * 30 + x) * 4;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        totalR += r;
+        totalG += g;
+        totalB += b;
+
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        if (luminance < minLuminance) minLuminance = luminance;
+        if (luminance > maxLuminance) maxLuminance = luminance;
+
+        // Classify skin tones in various ethnical profiles
+        const isSkin = r > 65 && g > 45 && b > 25 && r > g && r > b && (r - g) > 8;
+
+        // Center region represents the camera center aligned with the scanning overlay circle (X: 7..22, Y: 7..22)
+        const isCenter = x >= 7 && x <= 22 && y >= 7 && y <= 22;
+
+        if (isCenter) {
+          centerTotalPixels++;
+          if (isSkin) centerSkinPixels++;
+        } else {
+          outerTotalPixels++;
+          if (isSkin) outerSkinPixels++;
+        }
+      }
+    }
+
+    const count = data.length / 4;
+    const avgR = totalR / count;
+    const avgG = totalG / count;
+    const avgB = totalB / count;
+
+    const centerSkinRatio = centerSkinPixels / centerTotalPixels;
+    const outerSkinRatio = outerSkinPixels / outerTotalPixels;
+
+    // 1. Check if camera is covered (extremely low illumination or pitch dark)
+    if (avgR < 25 && avgG < 25 && avgB < 25) {
+      return false;
+    }
+
+    // 2. Reject flat, uniform surfaces (e.g. ceilings, flat sheets, plain light walls with zero shadows/features)
+    // A genuine face of a user has deep-contrast textures from eyelashes, eyes, nostrils, and hair
+    if (maxLuminance - minLuminance < 35) {
+      return false;
+    }
+
+    // 3. Central focus constraint (the user's physical face must cover the scanner ring area in the center)
+    if (centerSkinRatio < 0.15) {
+      return false;
+    }
+
+    // 4. Uniform background skin-tone rejection (e.g. warm wooden door frame, cabinetry, uniform beige wall)
+    // In a flat background, skin pixels are uniformly spread out (similar ratio in inner vs outer regions).
+    // In contrast, a centered face creates a notable spike/concentration in the focal center ring.
+    if (outerSkinRatio > 0.15 && centerSkinRatio < outerSkinRatio * 1.15) {
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    return true; // failure safe to avoid blocking client
+  }
+}
+

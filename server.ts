@@ -387,26 +387,47 @@ async function initializeDatabase() {
           [w.id, w.username, w.weddingName, w.avatarSeed || "rose", w.profilePicture || "", w.password || `${w.username}123`]
         );
       }
+    } else {
+      console.log(`Supabase state is live and active with ${count} registered celebrations. Patching any missing credentials...`);
+      // Explicitly repair and migrate passwords/credentials for pre-seeded wedding rows if they are NULL
+      await client.query(`
+        UPDATE weddings 
+        SET password = 'couple123', avatar_seed = 'rose' 
+        WHERE username = 'couple' AND (password IS NULL OR password = '')
+      `);
+      await client.query(`
+        UPDATE weddings 
+        SET password = 'password', avatar_seed = 'gold' 
+        WHERE username = 'rath' AND (password IS NULL OR password = '')
+      `);
+    }
 
-      // Seed gifts
+    // Seed gifts if they are empty
+    const resCountGifts = await client.query("SELECT COUNT(*) FROM gifts");
+    const countGifts = parseInt(resCountGifts.rows[0].count, 10);
+    if (countGifts === 0) {
+      console.log("Seeding initial gifts in PostgreSQL...");
       for (const g of INITIAL_DB_STATE.gifts) {
         await client.query(
           "INSERT INTO gifts (id, wedding_id, image_url, gift_date, full_name, address, amount_riel, amount_usd, other_notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT DO NOTHING",
           [g.id, g.weddingId, g.imageUrl || "", g.date, g.fullName, g.address, g.amountRiel, g.amountUsd, g.otherNotes || ""]
         );
       }
+    }
 
-      // Seed qrcodes
+    // Seed qrcodes if they are empty
+    const resCountQRs = await client.query("SELECT COUNT(*) FROM qrcodes");
+    const countQRs = parseInt(resCountQRs.rows[0].count, 10);
+    if (countQRs === 0) {
+      console.log("Seeding initial qrcodes in PostgreSQL...");
       for (const qr of INITIAL_DB_STATE.qrcodes) {
         await client.query(
           "INSERT INTO qrcodes (id, wedding_id, currency_type, qr_image_url, description, bank_name, account_number, account_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING",
           [qr.id, qr.weddingId, qr.currencyType, qr.qrImageUrl || "", qr.description, qr.bankName || "", qr.accountNumber || "", qr.accountName || ""]
         );
       }
-      console.log("Tables seeded successfully in Supabase!");
-    } else {
-      console.log(`Supabase state is live and active with ${count} registered celebrations.`);
     }
+    console.log("Postgres database migrations and updates completed successfully.");
 
     client.release();
   } catch (error) {

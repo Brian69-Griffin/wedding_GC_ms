@@ -60,6 +60,7 @@ export default function CashierLedger({
 
   // Camera capture inside form
   const [webcamFormActive, setWebcamFormActive] = useState(false);
+  const [formCameraFacing, setFormCameraFacing] = useState<"user" | "environment">("user");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -106,7 +107,7 @@ export default function CashierLedger({
     setError("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 300, height: 300, facingMode: "user" }
+        video: { width: 480, height: 480, facingMode: formCameraFacing }
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -115,8 +116,34 @@ export default function CashierLedger({
       }
     } catch (err) {
       console.error("Camera access error:", err);
-      setError("Unable to launch weapon camera. Try selecting a file instead.");
+      setError("Unable to launch webcam camera. Try selecting a file instead.");
       setWebcamFormActive(false);
+    }
+  };
+
+  // Toggle Form Camera (Switch user/environment facing)
+  const toggleFormCamera = async () => {
+    const nextFacing = formCameraFacing === "user" ? "environment" : "user";
+    setFormCameraFacing(nextFacing);
+    
+    // Stop current camera stream if any
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 480, height: 480, facingMode: nextFacing }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      console.error("Camera facing switch failed:", err);
+      setError(lang === "kh" ? "មិនអាចប្តូរកាមេរ៉ាបានទេ" : "Unable to switch camera facing orientation.");
     }
   };
 
@@ -133,15 +160,17 @@ export default function CashierLedger({
   const captureFormPhoto = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
-      canvas.width = 300;
-      canvas.height = 300;
+      canvas.width = 400;
+      canvas.height = 400;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        // center capture
-        ctx.scale(-1, 1);
-        ctx.translate(-300, 0);
-        ctx.drawImage(videoRef.current, 0, 0, 300, 300);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8); // 80% JPEG compression
+        // center capture + optionally mirror-flip only on front user camera
+        if (formCameraFacing === "user") {
+          ctx.scale(-1, 1);
+          ctx.translate(-400, 0);
+        }
+        ctx.drawImage(videoRef.current, 0, 0, 400, 400);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85); // 85% JPEG compression
         setFormImage(dataUrl);
         stopFormWebcam();
       }
@@ -498,6 +527,220 @@ export default function CashierLedger({
     doc.save(`Ceremony_Cash_Gift_Ledger-${activeWeddingId}.pdf`);
   };
 
+  // Robust printing function using hidden print iframe for perfect PC and mobile rendering
+  const handlePrintLedger = () => {
+    let iframe = document.getElementById("print-iframe") as HTMLIFrameElement;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (!doc) return;
+
+    doc.open();
+    doc.write(`
+      <html>
+        <head>
+          <title>${lang === "kh" ? "បញ្ជីចំណងដៃអាពាហ៍ពិពាហ៍" : "Wedding Gift Ledger"}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
+            body {
+              font-family: 'Plus Jakarta Sans', sans-serif;
+              padding: 20px;
+              color: #111;
+              background: #fff;
+            }
+            .title {
+              font-family: 'Playfair Display', serif;
+              text-align: center;
+              font-size: 24px;
+              margin-bottom: 5px;
+              font-weight: bold;
+              color: #730a0a;
+            }
+            .subtitle {
+              text-align: center;
+              font-size: 11px;
+              margin-bottom: 20px;
+              color: #666;
+            }
+            .metadata {
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              margin-bottom: 15px;
+              border-bottom: 1px solid #ddd;
+              padding-bottom: 10px;
+            }
+            .stats-row {
+              display: grid;
+              grid-template-cols: repeat(3, 1fr);
+              gap: 15px;
+              margin-bottom: 20px;
+              text-align: center;
+            }
+            .stat-card {
+              background: #fdf8f8;
+              border: 1px solid #ffe3e3;
+              padding: 10px;
+              border-radius: 8px;
+            }
+            .stat-card span {
+              display: block;
+              font-size: 9px;
+              text-transform: uppercase;
+              color: #777;
+              font-weight: bold;
+            }
+            .stat-card strong {
+              display: block;
+              font-size: 16px;
+              color: #880e0e;
+              margin-top: 4px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 11px;
+            }
+            th {
+              background-color: #880e0e;
+              color: white;
+              padding: 8px 10px;
+              text-align: left;
+              border: 1px solid #ddd;
+              font-size: 10px;
+              text-transform: uppercase;
+            }
+            td {
+              padding: 6px 10px;
+              border: 1px solid #ddd;
+            }
+            tr:nth-child(even) {
+              background-color: #fafafa;
+            }
+            .text-right {
+              text-align: right;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .footer {
+              margin-top: 35px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+              color: #555;
+            }
+            .signature-box {
+              border-top: 1px solid #444;
+              padding-top: 5px;
+              text-align: center;
+              width: 150px;
+            }
+            @media print {
+              body { padding: 0; }
+              @page { size: portrait; margin: 1cm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="title">${lang === "kh" ? "សៀវភៅបញ្ជីចំណងដៃអាពាហ៍ពិពាហ៍" : "Wedding Gift Registry Ledger"}</div>
+          <div class="subtitle">${lang === "kh" ? "បញ្ជីរៀបរាប់មាសប្រាក់ចំណងដៃឌីជីថលផ្លូវការ" : "Official Digital Cash Blessings Ledger Directory"}</div>
+          
+          <div class="metadata">
+            <div>
+              <strong>${lang === "kh" ? "អាពាហ៍ពិពាហ៍៖" : "Wedding Event:"}</strong> ${currentUser.weddingName || "Wedding Celebration"}
+            </div>
+            <div style="text-align: right;">
+              <div><strong>${lang === "kh" ? "កាលបរិច្ឆេទ៖" : "Date:"}</strong> ${new Date().toLocaleDateString(lang === "kh" ? "km-KH" : "en-US")}</div>
+              <div><strong>${lang === "kh" ? "អ្នកកត់ត្រា៖" : "Registrar:"}</strong> @${currentUser.username}</div>
+            </div>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-card">
+              <span>${lang === "kh" ? "ភ្ញៀវចូលរួមសរុប" : "Total Guests"}</span>
+              <strong>${allGifts.length}</strong>
+            </div>
+            <div class="stat-card">
+              <span>${lang === "kh" ? "ប្រាក់ដុល្លារសរុប (USD)" : "Grand Total USD"}</span>
+              <strong>$${allGifts.reduce((acc, g) => acc + (g.amountUsd || 0), 0).toLocaleString()}</strong>
+            </div>
+            <div class="stat-card">
+              <span>${lang === "kh" ? "ប្រាក់រៀលសរុប" : "Grand Total KHR"}</span>
+              <strong>${allGifts.reduce((acc, g) => acc + (g.amountRiel || 0), 0).toLocaleString()} ${lang === "kh" ? "៛" : "KHR"}</strong>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 30px;" class="text-center">${lang === "kh" ? "ល.រ" : "No."}</th>
+                <th>${lang === "kh" ? "ឈ្មោះភ្ញៀវ" : "Guest Full Name"}</th>
+                <th>${lang === "kh" ? "អាសយដ្ឋាន" : "Origin Address / For"}</th>
+                <th class="text-right">${lang === "kh" ? "ទឹកប្រាក់ USD" : "USD Amount"}</th>
+                <th class="text-right">${lang === "kh" ? "ទឹកប្រាក់ KHR" : "Riel Amount"}</th>
+                <th class="text-center">${lang === "kh" ? "កាលបរិច្ឆេទ" : "Date"}</th>
+                <th>${lang === "kh" ? "ចំណាំ" : "Notes"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allGifts.length === 0 ? `
+                <tr>
+                  <td colSpan="7" class="text-center">
+                    ${lang === "kh" ? "គ្មានទិន្នន័យចំណងដៃទេ" : "No cash wedding gift registered yet."}
+                  </td>
+                </tr>
+              ` : allGifts.map((g, idx) => `
+                <tr>
+                  <td class="text-center">${idx + 1}</td>
+                  <td><strong>${g.fullName}</strong></td>
+                  <td>${g.address || "-"}</td>
+                  <td class="text-right" style="color: #065f46; font-weight: bold;">
+                    ${g.amountUsd > 0 ? `$${g.amountUsd.toLocaleString()}` : "$0"}
+                  </td>
+                  <td class="text-right" style="color: #961212; font-weight: bold;">
+                    ${g.amountRiel > 0 ? `${g.amountRiel.toLocaleString()} ៛` : "0 ៛"}
+                  </td>
+                  <td class="text-center" style="font-size: 10px;">${g.date}</td>
+                  <td><span style="font-style: italic; font-size: 10px; color: #555;">${g.otherNotes || "-"}</span></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <div>
+              <p><strong>${lang === "kh" ? "ការបញ្ជាក់៖ ប្រព័ន្ធឌីជីថលទំនើប" : "Digital Verification Signature:"}</strong></p>
+              <p style="font-family: monospace; font-size: 9px; color: #777;">SHA256-${currentUser.weddingId?.slice(0, 8)}-${allGifts.length}</p>
+            </div>
+            <div class="signature-box">
+              <p><strong>${lang === "kh" ? "ហត្ថលេខាអ្នកកត់ត្រា" : "Registrar Authorized Signature"}</strong></p>
+              <div style="height: 40px;"></div>
+              <p style="color: #888;">@${currentUser.username}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    // Trigger iframe printing with standard delay
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    }, 400);
+  };
+
   // Client-side high fidelity excel sheet export
   const exportExcelLedger = () => {
     const wsData = [
@@ -643,7 +886,7 @@ export default function CashierLedger({
           <div className="truncate">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{t.grandTotalRiel}</p>
             <h3 className={`text-3xl font-black font-sans tracking-tight mt-1 ${isNightMode ? "text-emerald-450" : "text-emerald-800"}`}>
-              {totalRielCollected.toLocaleString()} <span className="text-xs font-normal text-gray-400">KHR</span>
+              {totalRielCollected.toLocaleString()} <span className="text-xs font-normal text-gray-400">{lang === "kh" ? "៛" : "KHR"}</span>
             </h3>
             <p className="text-[10px] text-gray-400 mt-1">{lang === "kh" ? "ក្រដាស់ប្រាក់រៀលជាតិ" : "Khmer National Currency"}</p>
           </div>
@@ -812,15 +1055,38 @@ export default function CashierLedger({
                   isNightMode ? "bg-black/30 border-amber-500/20 text-white" : "bg-gray-50 border-gray-250 text-gray-800"
                 }`}>
                   {webcamFormActive ? (
-                    <div className="w-full">
-                      <video ref={videoRef} className="mx-auto rounded-lg h-28 w-28 object-cover bg-black scale-x-[-1]" />
-                      <button
-                        type="button"
-                        onClick={captureFormPhoto}
-                        className="mt-2 text-[10px] bg-rose-800 text-white font-bold py-1 px-3 rounded-full hover:bg-rose-900 cursor-pointer"
-                      >
-                        {lang === "kh" ? "ថតរូបភាព" : "Capture Frame"}
-                      </button>
+                    <div className="w-full py-2">
+                      <span className="text-[10px] text-amber-500 font-bold block mb-2 tracking-widest uppercase font-mono animate-pulse">
+                        {lang === "kh" ? `កាមេរ៉ាសកម្ម៖ ${formCameraFacing === "user" ? "ខាងមុខ (Selfie)" : "ខាងក្រោយ (បន្ទប់)"}` : `Active Optic: ${formCameraFacing === "user" ? "Front (User)" : "Rear (Room)"}`}
+                      </span>
+                      <video
+                        ref={videoRef}
+                        className={`mx-auto rounded-2xl h-60 w-60 object-cover bg-black border-2 ${
+                          isNightMode ? "border-amber-500/30" : "border-rose-450/40 shadow-inner"
+                        }`}
+                        style={{ transform: formCameraFacing === "user" ? "scaleX(-1)" : "none" }}
+                      />
+                      <div className="mt-3 flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={captureFormPhoto}
+                          className="text-xs bg-rose-800 hover:bg-rose-900 border border-rose-900/40 text-white font-bold py-1.5 px-4 rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer active:scale-95"
+                        >
+                          <Camera size={12} />
+                          <span>{lang === "kh" ? "ថតរូបភាព" : "Capture Photo"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={toggleFormCamera}
+                          className={`text-xs font-bold py-1.5 px-3.5 rounded-xl border flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                            isNightMode 
+                              ? "bg-amber-955/40 border-amber-500/30 text-amber-300 hover:bg-amber-955/65" 
+                              : "bg-white border-gray-250 text-gray-700 hover:bg-gray-100 shadow-sm"
+                          }`}
+                        >
+                          <span>{lang === "kh" ? "🔄 ប្តូរកាមេរ៉ា" : "🔄 Switch Cam"}</span>
+                        </button>
+                      </div>
                     </div>
                   ) : formImage ? (
                     <div className="text-center relative">
@@ -986,7 +1252,7 @@ export default function CashierLedger({
               <div className="flex items-center gap-2 justify-end self-start">
                 <button
                   id="print_ledger_button"
-                  onClick={() => window.print()}
+                  onClick={handlePrintLedger}
                   className="flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-bold text-amber-900 hover:bg-amber-100 cursor-pointer shadow-sm select-none transition-all active:scale-95"
                   title="Print custom wedding gift ledger folder directly"
                 >
@@ -994,22 +1260,13 @@ export default function CashierLedger({
                   <span>{lang === "kh" ? "បោះពុម្ពបញ្ជី" : "Print Ledger"}</span>
                 </button>
                 <button
-                  id="export_pdf_button"
-                  onClick={exportPDFLedger}
-                  className="flex items-center gap-1 rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-[10px] font-bold text-rose-800 hover:bg-rose-100 cursor-pointer shadow-sm"
-                  title="Export official printable guest list PDF"
-                >
-                  <FileText size={11} />
-                  <span>PDF Directory</span>
-                </button>
-                <button
                   id="export_excel_button"
                   onClick={exportExcelLedger}
-                  className="flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 cursor-pointer shadow-sm"
+                  className="flex items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 cursor-pointer shadow-sm animate-pulse"
                   title="Export records to editable Excel spreadsheet"
                 >
                   <Download size={11} />
-                  <span>Excel Ledger</span>
+                  <span>{lang === "kh" ? "ទាញយកបញ្ជី Excel" : "Excel Ledger"}</span>
                 </button>
               </div>
             </div>
@@ -1129,7 +1386,7 @@ export default function CashierLedger({
                               )}
                               {g.amountRiel > 0 && (
                                 <p className={`text-[10px] font-black mt-0.5 font-sans ${isNightMode ? "text-emerald-400" : "text-emerald-850"}`}>
-                                  {g.amountRiel.toLocaleString()} <span className="text-[8px] font-normal text-gray-400">KHR</span>
+                                  {g.amountRiel.toLocaleString()} <span className="text-[8px] font-normal text-gray-400 text-rose-800 dark:text-amber-400">{lang === "kh" ? "៛" : "KHR"}</span>
                                 </p>
                               )}
                             </div>
@@ -1221,7 +1478,7 @@ export default function CashierLedger({
                         )}
                         {g.amountRiel > 0 && (
                           <p className={`text-xs font-extrabold mt-0.5 tracking-tight ${isNightMode ? "text-emerald-400" : "text-emerald-800"}`}>
-                            {g.amountRiel.toLocaleString()} <span className="text-[8px] font-normal text-gray-400">KHR</span>
+                            {g.amountRiel.toLocaleString()} <span className="text-[8px] font-normal text-gray-400 text-rose-800 dark:text-amber-400">{lang === "kh" ? "៛" : "KHR"}</span>
                           </p>
                         )}
                         {g.amountUsd === 0 && g.amountRiel === 0 && (
