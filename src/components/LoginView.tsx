@@ -30,11 +30,36 @@ export default function LoginView({
   const [faceScanning, setFaceScanning] = useState(false);
   const [faceError, setFaceError] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
+  const [faceScanProgress, setFaceScanProgress] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const t = translations[lang];
+
+  // Auto-sweep scanning execution when biometric view open
+  useEffect(() => {
+    let timer: any = null;
+    if (faceModalOpen && cameraActive && !faceScanning && !facePhoto) {
+      setFaceScanProgress(0);
+      timer = setInterval(() => {
+        setFaceScanProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(timer);
+            // Grab the frame automatically on full sweep completion!
+            setTimeout(() => {
+              captureAndAuthenticateFace();
+            }, 100);
+            return 100;
+          }
+          return prev + 2; // Complete sweep in ~1.5 seconds
+        });
+      }, 30);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [faceModalOpen, cameraActive, faceScanning, facePhoto]);
 
   const handleSubmit = async (e: React.FormEvent, customUser?: string, customPass?: string) => {
     e?.preventDefault();
@@ -375,20 +400,35 @@ export default function LoginView({
               {/* Secure Scanning viewport */}
               <div className="relative w-56 h-56 mx-auto mb-5 flex items-center justify-center rounded-full overflow-hidden bg-black border border-gray-800">
                 
-                {/* Visual scanner guides */}
+                {/* Visual circular progress meter */}
                 <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-                  <div className={`w-40 h-40 rounded-full border-2 border-dashed animate-[spin_12s_linear_infinite] ${
-                    isNightMode ? "border-amber-400/25" : "border-rose-450/35"
-                  }`} />
-                  <div className={`absolute w-36 h-36 rounded-full border border-double ${
-                    isNightMode ? "border-amber-400/40" : "border-rose-505/50"
-                  }`} />
+                  <svg className="w-52 h-52 absolute transform -rotate-90">
+                    <circle
+                      cx="104"
+                      cy="104"
+                      r="90"
+                      stroke={isNightMode ? "rgba(245,158,11,0.06)" : "rgba(159,18,57,0.04)"}
+                      strokeWidth="4"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="104"
+                      cy="104"
+                      r="90"
+                      stroke={isNightMode ? "#fbbf24" : "#9f1239"}
+                      strokeWidth="5"
+                      fill="transparent"
+                      strokeDasharray={2 * Math.PI * 90}
+                      strokeDashoffset={2 * Math.PI * 90 * (1 - faceScanProgress / 100)}
+                      className="transition-all duration-75"
+                    />
+                  </svg>
                   
-                  {/* Glowing vertical laser scanner bar */}
-                  <div className={`absolute left-0 right-0 h-0.5 animate-[bounce_2.5s_infinite] shadow ${
+                  {/* Glowing laser line swept down */}
+                  <div className={`absolute left-4 right-4 h-0.5 animate-[bounce_2s_infinite] shadow ${
                     isNightMode 
                       ? "bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-amber-400/60" 
-                      : "bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-rose-505/65"
+                      : "bg-gradient-to-r from-transparent via-rose-550 to-transparent shadow-rose-500/65"
                   }`} />
                 </div>
 
@@ -403,7 +443,7 @@ export default function LoginView({
                   <img 
                     src={facePhoto} 
                     alt="Scanned look" 
-                    className="w-full h-full object-cover" 
+                    className="w-full h-full object-cover animate-pulse" 
                   />
                 ) : (
                   <div className="text-gray-500 text-[10px] uppercase font-bold text-center p-4">
@@ -412,12 +452,26 @@ export default function LoginView({
                 )}
               </div>
 
-              <p className={`text-center text-[10px] mb-6 max-w-xs ${
-                isNightMode ? "text-amber-200/70" : "text-gray-500"
+              {/* Biometric Scan status pill */}
+              <div className={`mb-4 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase flex items-center gap-1.5 ${
+                isNightMode ? "bg-amber-955/50 border border-amber-500/10 text-amber-300 animate-pulse" : "bg-rose-50 border border-rose-100 text-rose-900"
+              }`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-ping" />
+                <span>
+                  {lang === "kh" ? `កម្រិតស្កែន៖ ${faceScanProgress}%` : `BIOMETRIC PROGRESS: ${faceScanProgress}%`}
+                </span>
+              </div>
+
+              <p className={`text-center text-xs font-semibold mb-6 max-w-xs ${
+                isNightMode ? "text-amber-200/90" : "text-rose-950"
               }`}>
                 {faceScanning 
-                  ? (lang === "kh" ? "កំពុងវិភាគទម្រង់មុខដើម្បីផ្ទៀងផ្ទាត់..." : "Analyzing optical biometric proportions...") 
-                  : (lang === "kh" ? "សូមបង្ហាញផ្ទៃមុខរបស់អ្នកឲ្យច្បាស់នៅមុខកាមេរ៉ា" : "Present your facial vector under direct lighting")
+                  ? (lang === "kh" ? "📡 ម៉ាស៊ីនបម្រើកំពុងផ្ទៀងផ្ទាត់ទិន្នន័យ..." : "📡 Matchmaking biometric registry keys...") 
+                  : faceScanProgress < 30 
+                  ? (lang === "kh" ? "🔍 កំពុងតម្រង់ទម្រង់ផ្ទៃមុខ..." : "🔍 Tracking facial profile dimensions...")
+                  : faceScanProgress < 70 
+                  ? (lang === "kh" ? "🔒 កំពុងវិភាគកូអរដោណេភ្នែក..." : "🔒 Comparing ocular feature positions...")
+                  : (lang === "kh" ? "✨ ស្ទើរតែរួចរាល់ហើយ! កំពុងផ្ទៀងផ្ទាត់..." : "✨ Almost completed! Finalizing handshake...")
                 }
               </p>
 
@@ -426,26 +480,13 @@ export default function LoginView({
                   type="button"
                   onClick={closeFaceModal}
                   disabled={faceScanning}
-                  className={`w-1/3 py-2 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                  className={`w-full py-2.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                     isNightMode 
-                      ? "border-amber-500/10 bg-black text-amber-500 hover:bg-amber-500/5 text-amber-400" 
-                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      ? "border-amber-500/10 bg-black text-amber-400 hover:bg-amber-500/5" 
+                      : "border-gray-250 bg-white text-gray-700 hover:bg-gray-50"
                   }`}
                 >
-                  {lang === "kh" ? "បោះបង់" : "Cancel"}
-                </button>
-                <button
-                  type="button"
-                  onClick={captureAndAuthenticateFace}
-                  disabled={faceScanning || !cameraActive}
-                  className={`w-2/3 py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                    isNightMode 
-                      ? "bg-amber-500 text-rose-955 hover:bg-amber-400" 
-                      : "bg-rose-800 text-white hover:bg-rose-900"
-                  }`}
-                >
-                  <Camera size={12} />
-                  <span>{faceScanning ? (lang === "kh" ? "កំពុងផ្ទៀងផ្ទាត់..." : "Verifying...") : (lang === "kh" ? "ស្កែនផ្ទៃមុខ" : "Scan to Unlock")}</span>
+                  {lang === "kh" ? "បោះបង់" : "Cancel Scan"}
                 </button>
               </div>
             </div>

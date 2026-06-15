@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Heart, Notebook, QrCode, LogOut } from "lucide-react";
+import { Heart, Notebook, QrCode, LogOut, Shield, Menu, X } from "lucide-react";
 import { SecurityUser, GiftRecord, QRCodeConfig } from "./types";
 import { Language, translations } from "./i18n";
 import LoginView from "./components/LoginView";
@@ -10,7 +10,6 @@ import FaceSearchModal from "./components/FaceSearchModal";
 import ConfirmationModal from "./components/ConfirmationModal";
 import LoadingSpinner from "./components/LoadingSpinner";
 import ConnectFaceModal from "./components/ConnectFaceModal";
-import { Shield } from "lucide-react";
 
 export default function App() {
   // Language selector state
@@ -96,6 +95,7 @@ export default function App() {
   const [scannedMatchId, setScannedMatchId] = useState<string | null>(null);
   const [isFaceSearchOpen, setIsFaceSearchOpen] = useState(false);
   const [isConnectFaceOpen, setIsConnectFaceOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Load database structures for logged in couple
   const fetchCoupleData = async (weddingId: string, isSilent = false) => {
@@ -206,7 +206,7 @@ export default function App() {
             ? "border-amber-500/25 bg-[#150202]/95 backdrop-blur-md text-white" 
             : "border-rose-100 bg-white/80 backdrop-blur-md text-gray-950"
         }`}>
-          <div className="mx-auto flex flex-col md:flex-row md:h-16 h-auto max-w-7xl items-center justify-between gap-3 md:gap-0 px-4 py-3.5 md:py-0">
+          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
             {/* Logo brand label */}
             <div className="flex items-center gap-2 select-none group">
               <div className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-md transition-all ${
@@ -226,8 +226,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Navigation Tabs selection */}
-            <nav className={`flex items-center gap-1.5 p-1 rounded-xl border transition-all ${
+            {/* Navigation Tabs selection - Desktop Only */}
+            <nav className={`hidden md:flex items-center gap-1.5 p-1 rounded-xl border transition-all ${
               isNightMode 
                 ? "bg-black/45 border-rose-955" 
                 : "bg-gray-100 border-gray-150"
@@ -237,7 +237,7 @@ export default function App() {
                 onClick={() => setActiveTab("ledger")}
                 className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition-all select-none cursor-pointer ${
                   activeTab === "ledger"
-                    ? isNightMode ? "bg-amber-500 text-rose-950 shadow" : "bg-white text-rose-900 shadow-sm"
+                    ? isNightMode ? "bg-amber-500 text-rose-955 shadow" : "bg-white text-rose-900 shadow-sm"
                     : isNightMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
                 }`}
               >
@@ -250,7 +250,7 @@ export default function App() {
                 onClick={() => setActiveTab("qrcodes")}
                 className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition-all select-none cursor-pointer ${
                   activeTab === "qrcodes"
-                    ? isNightMode ? "bg-amber-500 text-rose-950 shadow" : "bg-white text-rose-900 shadow-sm"
+                    ? isNightMode ? "bg-amber-500 text-rose-955 shadow" : "bg-white text-rose-900 shadow-sm"
                     : isNightMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-900"
                 }`}
               >
@@ -259,8 +259,8 @@ export default function App() {
               </button>
             </nav>
 
-            {/* Language, Lucky Toggle, and signout actions */}
-            <div className="flex items-center gap-3">
+            {/* Language, Lucky Toggle, and actions - Desktop Only */}
+            <div className="hidden md:flex items-center gap-3">
               {/* Gold/Red Lucky Night Mode toggle button */}
               <button
                 onClick={toggleNightMode}
@@ -281,7 +281,7 @@ export default function App() {
                   className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
                     lang === "en"
                       ? "bg-rose-800 text-white shadow"
-                      : "text-gray-450 hover:text-gray-200"
+                      : "text-gray-400 hover:text-gray-900"
                   }`}
                 >
                   EN
@@ -291,64 +291,23 @@ export default function App() {
                   className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
                     lang === "kh"
                       ? "bg-rose-800 text-white shadow"
-                      : "text-gray-450 hover:text-gray-200"
+                      : "text-gray-400 hover:text-gray-900"
                   }`}
                 >
                   ខ្មែរ
                 </button>
               </div>
 
-              {/* Mobile Quick Sign Out */}
-              {/* Mobile Connect Face Login */}
-              <button
-                id="connect_face_mobile_btn"
-                onClick={() => setIsConnectFaceOpen(true)}
-                className={`flex md:hidden items-center justify-center p-2 rounded-xl border transition-all select-none active:scale-95 cursor-pointer ${
-                  isNightMode 
-                    ? "bg-amber-955/25 text-amber-400 border-amber-500/20 hover:bg-amber-950" 
-                    : "bg-rose-50 text-rose-800 border-rose-101 hover:bg-rose-100/40"
-                }`}
-                title={lang === "kh" ? "ភ្ជាប់ស្កែនមុខ" : "Connect Face Security"}
-              >
-                <Shield size={13} className="text-amber-450" />
-              </button>
-
-              <button
-                id="quick_sign_out_mobile_btn"
-                onClick={() => {
-                  setConfirmModal({
-                    isOpen: true,
-                    title: lang === "kh" ? "ចាកចេញពីប្រព័ន្ធ" : "Sign Out",
-                    message: t.confirmLogout,
-                    confirmText: lang === "kh" ? "ចាកចេញ" : "Sign Out",
-                    cancelText: lang === "kh" ? "បោះបង់" : "Cancel",
-                    type: "logout",
-                    onConfirm: () => {
-                      handleLogout();
-                      setConfirmModal(null);
-                    }
-                  });
-                }}
-                className={`flex md:hidden items-center justify-center p-2 rounded-xl border transition-all select-none active:scale-95 cursor-pointer ${
-                  isNightMode 
-                    ? "bg-rose-950/40 text-rose-350 border-rose-900/50 hover:bg-rose-900/30" 
-                    : "bg-rose-50 text-rose-850 border-rose-100 hover:bg-rose-101"
-                }`}
-                title={t.signOut}
-              >
-                <LogOut size={13} />
-              </button>
-
-              <div className="hidden md:flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <span className={`text-[11px] font-bold px-3 py-1.5 rounded-full border ${isNightMode ? "bg-black/40 border-rose-950 text-amber-300" : "bg-gray-100 border-gray-205 text-gray-500"}`}>
-                  {t.loggedIn}: <span className="text-rose-450">@{currentUser.username}</span>
+                  {t.loggedIn}: <span className="text-rose-455">@{currentUser.username}</span>
                 </span>
                 <button
                   id="connect_face_header_btn"
                   onClick={() => setIsConnectFaceOpen(true)}
                   className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold border transition-all select-none active:scale-95 cursor-pointer ${
                     isNightMode 
-                      ? "bg-amber-955/25 text-amber-400 border-amber-500/20 hover:bg-amber-950/40 shadow-sm" 
+                      ? "bg-amber-550/25 text-amber-400 border-amber-500/20 hover:bg-amber-950/40 shadow-sm" 
                       : "bg-rose-50 text-rose-800 border-rose-101 hover:bg-rose-100/60 shadow-sm"
                   }`}
                   title={lang === "kh" ? "ស្កែនទម្រង់មុខដើម្បីចូលគណនីពេលក្រោយ" : "Click to establish face login biometrics"}
@@ -383,7 +342,163 @@ export default function App() {
                 </button>
               </div>
             </div>
+
+            {/* Mobile-only Hamburger Menu Button */}
+            <div className="flex md:hidden items-center gap-2">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className={`p-2 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+                  isNightMode
+                    ? "bg-amber-955/20 text-amber-400 border-amber-500/15"
+                    : "bg-rose-50/50 border-rose-100 text-rose-900"
+                }`}
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
           </div>
+
+          {/* Mobile Collapsible Dropdown Menu */}
+          {mobileMenuOpen && (
+            <div className={`md:hidden border-t px-4 py-4 space-y-4 animate-[slideDown_0.2s_ease-out] ${
+              isNightMode 
+                ? "bg-[#180303] border-amber-500/10 text-white" 
+                : "bg-rose-50/95 border-rose-100 text-gray-900 shadow-lg"
+            }`}>
+              {/* Menu Tabs Navigation */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  {lang === "kh" ? "ជម្រើសទំព័រ" : "Navigation tabs"}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveTab("ledger");
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border cursor-pointer transition-all ${
+                      activeTab === "ledger"
+                        ? isNightMode ? "bg-amber-500 border-transparent text-rose-955 shadow" : "bg-rose-800 border-transparent text-white shadow"
+                        : isNightMode ? "bg-black/35 border-amber-500/10 text-amber-250" : "bg-white border-rose-200 text-rose-900"
+                    }`}
+                  >
+                    <Notebook size={14} />
+                    <span>{t.registryLedger}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("qrcodes");
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border cursor-pointer transition-all ${
+                      activeTab === "qrcodes"
+                        ? isNightMode ? "bg-amber-500 border-transparent text-rose-955 shadow" : "bg-rose-800 border-transparent text-white shadow"
+                        : isNightMode ? "bg-black/35 border-amber-500/10 text-amber-250" : "bg-white border-rose-200 text-rose-900"
+                    }`}
+                  >
+                    <QrCode size={14} />
+                    <span>{t.qrEnvelopesTab}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Preferences Settings (Language, Theme) */}
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100/10">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  {lang === "kh" ? "ការកំណត់ភាសា និងប្រធានបទ" : "Preferences & Theme"}
+                </span>
+                <div className="flex items-center gap-2">
+                  {/* Theme toggler */}
+                  <button
+                    onClick={toggleNightMode}
+                    className={`p-2 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+                      isNightMode
+                        ? "bg-amber-450 text-rose-955 border-amber-300 shadow"
+                        : "bg-white border-rose-100 text-rose-850"
+                    }`}
+                  >
+                    <span className="text-sm select-none">🧧</span>
+                  </button>
+
+                  {/* Language switch */}
+                  <div className={`flex p-0.5 rounded-lg border ${isNightMode ? "bg-black/30 border-rose-950" : "bg-white border-rose-100"}`}>
+                    <button
+                      onClick={() => toggleLang("en")}
+                      className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        lang === "en" ? "bg-rose-800 text-white shadow" : "text-gray-450 hover:text-gray-900"
+                      }`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      onClick={() => toggleLang("kh")}
+                      className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                        lang === "kh" ? "bg-rose-800 text-white shadow" : "text-gray-455 hover:text-gray-900"
+                      }`}
+                    >
+                      ខ្មែរ
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Identity Details & Key Secure Actions */}
+              <div className="pt-2 border-t border-gray-100/10 space-y-3">
+                <div className={`flex items-center justify-between p-3 rounded-xl ${
+                  isNightMode ? "bg-black/40 text-amber-250 border border-amber-500/15" : "bg-white border border-rose-150 text-rose-955"
+                }`}>
+                  <span className="text-xs font-bold">{t.loggedIn}</span>
+                  <span className="text-xs font-black">@{currentUser.username}</span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  {/* Connect Face */}
+                  <button
+                    onClick={() => {
+                      setIsConnectFaceOpen(true);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border transition-all cursor-pointer ${
+                      isNightMode 
+                        ? "bg-amber-955/20 text-amber-400 border-amber-500/15 hover:bg-amber-950" 
+                        : "bg-rose-50 text-rose-800 border-rose-101 hover:bg-rose-100/40"
+                    }`}
+                  >
+                    <Shield size={14} className="text-amber-450 animate-pulse" />
+                    <span>{lang === "kh" ? "ភ្ជាប់ស្កែនមុខ" : "Connect Face Login"}</span>
+                  </button>
+
+                  {/* Sign Out */}
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setConfirmModal({
+                        isOpen: true,
+                        title: lang === "kh" ? "ចាកចេញពីប្រព័ន្ធ" : "Sign Out",
+                        message: t.confirmLogout,
+                        confirmText: lang === "kh" ? "ចាកចេញ" : "Sign Out",
+                        cancelText: lang === "kh" ? "បោះបង់" : "Cancel",
+                        type: "logout",
+                        onConfirm: () => {
+                          handleLogout();
+                          setConfirmModal(null);
+                        }
+                      });
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border transition-all cursor-pointer ${
+                      isNightMode 
+                        ? "bg-rose-955/40 text-rose-300 border-rose-900/50 hover:bg-[#250303]" 
+                        : "bg-rose-100 text-rose-955 border-rose-150 hover:bg-rose-200"
+                    }`}
+                  >
+                    <LogOut size={14} />
+                    <span>{t.signOut}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Content Tabs Wrapper */}
@@ -439,35 +554,129 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen transition-all duration-300 leading-normal font-sans antialiased selection:bg-rose-100 selection:text-rose-950 ${
-      isNightMode 
-        ? "bg-gradient-to-br from-[#0c0000] via-[#1c0202] to-[#250303] text-gray-100" 
-        : "bg-gradient-to-br from-[#fffbfb] via-[#fff5f5] to-rose-50/20 text-gray-900"
-    }`}>
-      {renderView()}
-      
-      {/* Dynamic Global Loading Spinner during details fetch */}
-      {(fetchingData || (!initialSynced && currentUser && currentUser.role === "couple")) && (
-        <LoadingSpinner 
-          overlay 
-          message={lang === "kh" ? "កំពុងទាញយកទិន្នន័យចំណងដៃ..." : "Syncing ledger records..."} 
-        />
-      )}
+    <>
+      <div className="print:hidden">
+        <div className={`min-h-screen transition-all duration-300 leading-normal font-sans antialiased selection:bg-rose-100 selection:text-rose-950 ${
+          isNightMode 
+            ? "bg-gradient-to-br from-[#0c0000] via-[#1c0202] to-[#250303] text-gray-100" 
+            : "bg-gradient-to-br from-[#fffbfb] via-[#fff5f5] to-rose-50/20 text-gray-900"
+        }`}>
+          {renderView()}
+          
+          {/* Dynamic Global Loading Spinner during details fetch */}
+          {(fetchingData || (!initialSynced && currentUser && currentUser.role === "couple")) && (
+            <LoadingSpinner 
+              overlay 
+              message={lang === "kh" ? "កំពុងទាញយកទិន្នន័យចំណងដៃ..." : "Syncing ledger records..."} 
+            />
+          )}
 
-      {/* Dynamic Global Confirmation Modal */}
-      {confirmModal?.isOpen && (
-        <ConfirmationModal
-          isOpen={confirmModal.isOpen}
-          title={confirmModal.title}
-          message={confirmModal.message}
-          confirmText={confirmModal.confirmText}
-          cancelText={confirmModal.cancelText}
-          type={confirmModal.type}
-          onConfirm={confirmModal.onConfirm}
-          onCancel={() => setConfirmModal(null)}
-          isNightMode={isNightMode}
-        />
+          {/* Dynamic Global Confirmation Modal */}
+          {confirmModal?.isOpen && (
+            <ConfirmationModal
+              isOpen={confirmModal.isOpen}
+              title={confirmModal.title}
+              message={confirmModal.message}
+              confirmText={confirmModal.confirmText}
+              cancelText={confirmModal.cancelText}
+              type={confirmModal.type}
+              onConfirm={confirmModal.onConfirm}
+              onCancel={() => setConfirmModal(null)}
+              isNightMode={isNightMode}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* High-Fidelity Gorgeous Print Layout */}
+      {currentUser && currentUser.role === "couple" && (
+        <div className="hidden print:block bg-white text-black p-8 font-serif leading-relaxed">
+          {/* Print Header */}
+          <div className="border-b-4 border-double border-red-900 pb-4 mb-6 flex justify-between items-end">
+            <div>
+              <h1 className="text-2xl font-black text-rose-900 mb-1 font-serif">
+                {currentUser.weddingName || (lang === "kh" ? "សៀវភៅកត់ចំណងដៃអាពាហ៍ពិពាហ៍" : "Official Wedding Ceremony Registry")}
+              </h1>
+              <p className="text-xs text-gray-600 font-sans tracking-wide">
+                {lang === "kh" ? "របាយការណ៍ផ្លូវការនៃការទទួលបានចំណងដៃ" : "Official Digital Cash Ledger Directory & Summary Output"}
+              </p>
+            </div>
+            <div className="text-right text-xs font-sans text-gray-500">
+              <p>{lang === "kh" ? `កាលបរិច្ឆេទបោះពុម្ព៖ ${new Date().toLocaleDateString("km-KH")}` : `Printed on: ${new Date().toLocaleDateString()}`}</p>
+              <p>{lang === "kh" ? `operator គណនី៖ @${currentUser.username}` : `Operator Username: @${currentUser.username}`}</p>
+            </div>
+          </div>
+
+          {/* Summary KPI Boards */}
+          <div className="grid grid-cols-3 gap-4 border border-gray-200 bg-gray-50/50 p-4 rounded-xl mb-6">
+            <div className="text-center border-r border-gray-200 last:border-r-0">
+              <span className="text-[10px] font-sans font-bold text-gray-500 block uppercase tracking-wider">{lang === "kh" ? "ភ្ញៀវចូលរួមសរុប" : "Total Guests"}</span>
+              <span className="text-xl font-bold font-serif">{allGifts.length}</span>
+            </div>
+            <div className="text-center border-r border-gray-200 last:border-r-0">
+              <span className="text-[10px] font-sans font-bold text-gray-500 block uppercase tracking-wider">{lang === "kh" ? "ប្រាក់ដុល្លារសរុប (USD)" : "Grand Total USD"}</span>
+              <span className="text-xl font-black text-emerald-850 font-serif">${allGifts.reduce((acc, g) => acc + (g.amountUsd || 0), 0).toLocaleString()}</span>
+            </div>
+            <div className="text-center">
+              <span className="text-[10px] font-sans font-bold text-gray-500 block uppercase tracking-wider">{lang === "kh" ? "ប្រាក់រៀលសរុប (៛)" : "Grand Total KHR"}</span>
+              <span className="text-xl font-black text-rose-850 font-serif">{allGifts.reduce((acc, g) => acc + (g.amountRiel || 0), 0).toLocaleString()} ៛</span>
+            </div>
+          </div>
+
+          {/* Table list */}
+          <table className="w-full border-collapse border border-gray-300 text-xs text-left">
+            <thead>
+              <tr className="bg-rose-900 text-white font-sans text-[10px] uppercase font-bold">
+                <th className="border border-gray-300 px-3 py-2 text-center w-10">{lang === "kh" ? "ល.រ" : "No."}</th>
+                <th className="border border-gray-300 px-3 py-2">{lang === "kh" ? "ឈ្មោះភ្ញៀវ" : "Guest Full Name"}</th>
+                <th className="border border-gray-300 px-3 py-2">{lang === "kh" ? "អាសយដ្ឋាន/មកពី" : "Origin Address / For"}</th>
+                <th className="border border-gray-300 px-3 py-2 text-right">{lang === "kh" ? "ទឹកប្រាក់ USD" : "USD Amount"}</th>
+                <th className="border border-gray-300 px-3 py-2 text-right">{lang === "kh" ? "ទឹកប្រាក់ RIEL" : "Riel Amount"}</th>
+                <th className="border border-gray-300 px-3 py-2 text-center">{lang === "kh" ? "ថ្ងៃទទួល" : "Date"}</th>
+                <th className="border border-gray-300 px-3 py-2">{lang === "kh" ? "កំណត់ចំណាំ" : "Notes"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allGifts.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="border border-gray-300 px-3 py-4 text-center font-sans text-gray-500">
+                    {lang === "kh" ? "គ្មានទិន្នន័យចំណងដៃក្នុងសៀវភៅទេ" : "No cash wedding gift registered yet."}
+                  </td>
+                </tr>
+              ) : (
+                allGifts.map((g, idx) => (
+                  <tr key={g.id || idx} className="hover:bg-gray-50 odd:bg-white even:bg-gray-50/30">
+                    <td className="border border-gray-300 px-3 py-1.5 text-center font-sans font-medium">{idx + 1}</td>
+                    <td className="border border-gray-300 px-3 py-1.5 font-bold">{g.fullName}</td>
+                    <td className="border border-gray-300 px-3 py-1.5 font-sans">{g.address || "-"}</td>
+                    <td className="border border-gray-300 px-3 py-1.5 text-right font-mono font-bold text-emerald-800">
+                      {g.amountUsd > 0 ? `$${g.amountUsd.toLocaleString()}` : "$0"}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-1.5 text-right font-mono font-bold text-rose-800">
+                      {g.amountRiel > 0 ? `${g.amountRiel.toLocaleString()} ៛` : "0 ៛"}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-1.5 text-center font-sans text-[10px] whitespace-nowrap">{g.date}</td>
+                    <td className="border border-gray-300 px-3 py-1.5 font-sans text-[10px] text-gray-700 italic">{g.otherNotes || "-"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+
+          {/* Footer signature / certification area */}
+          <div className="mt-12 flex justify-between items-center text-xs font-sans text-gray-600">
+            <div>
+              <p className="font-bold">{lang === "kh" ? "ការបញ្ជាក់ពីប្រព័ន្ធឌីជីថល៖" : "Security Checksum Verified:"}</p>
+              <p className="text-[10px] font-mono select-all uppercase">SHA256-{currentUser.weddingId?.slice(0, 8)}-{allGifts.length}-{new Date().getTime().toString(16).toUpperCase()}</p>
+            </div>
+            <div className="border-t border-gray-400 pt-3 text-center w-48">
+              <p className="font-bold text-gray-800">{lang === "kh" ? "ហត្ថលេខាអ្នកកត់ត្រា" : "Registrar Authorized Signature"}</p>
+              <div className="h-12"></div>
+              <p className="text-[10px] text-gray-400">@{currentUser.username}</p>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }

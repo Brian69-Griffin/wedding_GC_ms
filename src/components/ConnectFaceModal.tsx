@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Camera, Shield, X, CheckCircle, Smartphone, User, Sparkles } from "lucide-react";
-import { Language } from "../types";
+import { Camera, Shield, X, CheckCircle, Sparkles, Check, HelpCircle } from "lucide-react";
+import { Language } from "../i18n";
 
 interface ConnectFaceModalProps {
   onClose: () => void;
@@ -15,9 +15,21 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
+  
+  // Streamlined Automated Scanning States
+  const [scanProgress, setScanProgress] = useState(0);
+  const [activeStep, setActiveStep] = useState(0); // 0=center, 1=right, 2=left, 3=up, 4=down
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const steps = [
+    { id: 0, textEn: "Center Face Position", textKh: "ដាក់ផ្ទៃមុខចំកណ្តាល" },
+    { id: 1, textEn: "Turn Slightly Right ➡️", textKh: "បង្វែរមុខទៅស្តាំបន្តិច ➡️" },
+    { id: 2, textEn: "Turn Slightly Left ⬅️", textKh: "បង្វែរមុខទៅឆ្វេងបន្តិច ⬅️" },
+    { id: 3, textEn: "Look / Tilt Face Up ⬆️", textKh: "ងើបមុខឡើងលើបន្តិច ⬆️" },
+    { id: 4, textEn: "Look / Tilt Face Down ⬇️", textKh: "ឱនមុខចុះក្រោមបន្តិច ⬇️" },
+  ];
 
   useEffect(() => {
     // Auto-prompt camera start
@@ -27,10 +39,53 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
     };
   }, []);
 
+  // Automated step progression interval
+  useEffect(() => {
+    let interval: any = null;
+    if (cameraActive && !success && !registering) {
+      setScanProgress(0);
+      setActiveStep(0);
+      
+      interval = setInterval(() => {
+        setScanProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            // Instantly trigger automated screen grab!
+            setTimeout(() => {
+              triggerAutoCapture();
+            }, 200);
+            return 100;
+          }
+          const nextVal = prev + 1;
+          
+          // Progress breakpoints for 5 biometrical steps (20% duration each)
+          if (nextVal < 20) {
+            setActiveStep(0);
+          } else if (nextVal < 40) {
+            setActiveStep(1);
+          } else if (nextVal < 60) {
+            setActiveStep(2);
+          } else if (nextVal < 80) {
+            setActiveStep(3);
+          } else {
+            setActiveStep(4);
+          }
+          
+          return nextVal;
+        });
+      }, 35); // 35ms * 100 cycles = ~3.5s total organic scanning
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [cameraActive, success, registering]);
+
   const startCamera = async () => {
     setError("");
     setCameraActive(true);
     setPhoto(null);
+    setScanProgress(0);
+    setActiveStep(0);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 400, height: 400, facingMode: "user" }
@@ -58,7 +113,7 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
     setCameraActive(false);
   };
 
-  const capturePhoto = () => {
+  const triggerAutoCapture = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
       canvas.width = 360;
@@ -72,12 +127,13 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
         const dataUrl = canvas.toDataURL("image/jpeg", 0.88); // 88% high-fidelity JPEG
         setPhoto(dataUrl);
         stopCamera();
+        // Fire server register action automatically!
+        handleRegisterWithPhoto(dataUrl);
       }
     }
   };
 
-  const handleRegister = async () => {
-    if (!photo) return;
+  const handleRegisterWithPhoto = async (photoData: string) => {
     setError("");
     setRegistering(true);
 
@@ -88,7 +144,7 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
           "Content-Type": "application/json",
           "x-wedding-id": activeWeddingId,
         },
-        body: JSON.stringify({ faceImage: photo }),
+        body: JSON.stringify({ faceImage: photoData }),
       });
 
       const data = await response.json();
@@ -99,6 +155,8 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || "Failed to handshake with biometric registry");
+      // Turn camera back on to retry
+      startCamera();
     } finally {
       setRegistering(false);
     }
@@ -120,7 +178,7 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
           <div className="flex items-center gap-2.5">
             <Shield className="text-amber-400 animate-pulse" size={20} />
             <span className="font-serif text-sm font-bold tracking-wide">
-              {lang === "kh" ? "ប្រព័ន្ធស្កែនទម្រង់មុខធនាគារ" : "Bank-Grade Face ID Linker"}
+              {lang === "kh" ? "ប្រព័ន្ធកត់ត្រាទម្រង់មុខជីវមាត្រ" : "Holographic Biometric Scanner"}
             </span>
           </div>
           <button
@@ -159,8 +217,8 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
                 isNightMode ? "text-amber-200/80" : "text-gray-500"
               }`}>
                 {lang === "kh" 
-                  ? "គណនីរបស់អ្នកឥឡូវនេះត្រូវបានការពារដោយប្រព័ន្ធជីវមាត្រ។ អ្នកអាចចូលគណនីដោយគ្រាន់តែប្រើទម្រង់មុខរបស់អ្នកនៅពេលក្រោយ។" 
-                  : "Your wedding ledger is now biometrically protected. You can instantly sign in using your face next session."}
+                  ? "គណនីរបស់អ្នកត្រូវបានការពារដោយប្រព័ន្ធជីវមាត្រ។ ឧបករណ៍ស្កែនទម្រង់មុខស្វ័យប្រវត្តបានកត់ត្រា 5 មុំរួចរាល់។" 
+                  : "Your wedding ledger account is now protected. Automatic biometric sweep locked in all 5 dynamic angles."}
               </p>
               <button
                 onClick={() => {
@@ -169,7 +227,7 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
                 }}
                 className={`w-full py-2.5 text-xs font-bold rounded-xl cursor-pointer ${
                   isNightMode 
-                    ? "bg-amber-500 text-rose-950 hover:bg-amber-400" 
+                    ? "bg-amber-500 text-rose-955 hover:bg-amber-400" 
                     : "bg-rose-800 text-white hover:bg-rose-900"
                 }`}
               >
@@ -178,33 +236,40 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
             </div>
           ) : (
             <div className="flex flex-col items-center">
-              {/* Webcam Scanning Container */}
-              <div className="relative w-64 h-64 mx-auto mb-6 flex items-center justify-center rounded-3xl overflow-hidden bg-black border border-gray-800">
+              {/* Automated webcam stream & radar overlay */}
+              <div className="relative w-56 h-56 mx-auto mb-4 flex items-center justify-center rounded-full overflow-hidden bg-black border border-gray-800">
                 
-                {/* Simulated high-tech radar overlay */}
+                {/* 360-degree dynamic sweep rings */}
                 <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-                  {/* Outer circle guide matching high security standards */}
-                  <div className={`w-48 h-48 rounded-full border-2 border-dashed animate-[spin_10s_linear_infinite] ${
-                    isNightMode ? "border-amber-400/30" : "border-rose-450/40"
-                  }`} />
-                  
-                  {/* Inside high-contrast scanning overlay bounds */}
-                  <div className={`absolute w-44 h-44 rounded-full border border-double ${
-                    isNightMode ? "border-amber-400/50" : "border-rose-500/60"
-                  }`} />
+                  {/* Glowing progress circular border */}
+                  <svg className="w-52 h-52 absolute transform -rotate-90">
+                    <circle
+                      cx="104"
+                      cy="104"
+                      r="90"
+                      stroke={isNightMode ? "rgba(245,158,11,0.08)" : "rgba(159,18,57,0.06)"}
+                      strokeWidth="5"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="104"
+                      cy="104"
+                      r="90"
+                      stroke={isNightMode ? "#fbbf24" : "#9f1239"}
+                      strokeWidth="6"
+                      fill="transparent"
+                      strokeDasharray={2 * Math.PI * 90}
+                      strokeDashoffset={2 * Math.PI * 90 * (1 - scanProgress / 100)}
+                      className="transition-all duration-75"
+                    />
+                  </svg>
 
-                  {/* High-speed glowing laser scanline */}
-                  <div className={`absolute left-0 right-0 h-0.5 animate-[bounce_3s_infinite] shadow-lg ${
+                  {/* Laser scan line flashing along scope directions */}
+                  <div className={`absolute left-4 right-4 h-0.5 animate-[bounce_2.5s_infinite] shadow-lg ${
                     isNightMode 
-                      ? "bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-amber-400/70" 
-                      : "bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-rose-500/70"
+                      ? "bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-amber-400/80" 
+                      : "bg-gradient-to-r from-transparent via-rose-600 to-transparent shadow-rose-600/80"
                   }`} />
-                  
-                  {/* Reticle angles */}
-                  <div className={`absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 ${isNightMode ? "border-amber-400" : "border-rose-700"}`} />
-                  <div className={`absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 ${isNightMode ? "border-amber-400" : "border-rose-700"}`} />
-                  <div className={`absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 ${isNightMode ? "border-amber-400" : "border-rose-700"}`} />
-                  <div className={`absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 ${isNightMode ? "border-amber-400" : "border-rose-700"}`} />
                 </div>
 
                 {cameraActive ? (
@@ -214,71 +279,82 @@ export default function ConnectFaceModal({ onClose, activeWeddingId, lang, isNig
                     playsInline 
                     muted 
                   />
-                ) : photo ? (
-                  <img 
-                    src={photo} 
-                    alt="Captured preview" 
-                    className="w-full h-full object-cover" 
-                  />
                 ) : (
-                  <div className="text-gray-600 text-xs text-center p-4">
-                    {lang === "kh" ? "កំពុងបើកកាមេរ៉ា..." : "Initializing facial scanners..."}
+                  <div className="text-gray-500 text-xs text-center p-4">
+                    {lang === "kh" ? "កំពុងបើកកាមេរ៉ាស្កែន..." : "Initiating 5-angle biometric radar..."}
                   </div>
                 )}
               </div>
 
-              {/* Status helper text */}
-              <p className={`text-center text-[11px] mb-6 leading-relaxed max-w-xs ${
-                isNightMode ? "text-amber-200/70" : "text-gray-500"
+              {/* Progress counter pill */}
+              <div className={`mb-4 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5 ${
+                isNightMode ? "bg-amber-950/40 text-amber-300 border border-amber-500/10" : "bg-rose-50 text-rose-900 border border-rose-100"
               }`}>
-                {!photo 
-                  ? (lang === "kh" ? "សូមដាក់ផ្ទៃមុខរបស់អ្នកឲ្យចំកណ្តាលរង្វង់ សម្រាប់ការផ្ទៀងផ្ទាត់កម្រិតខ្ពស់។" : "Align your facial structure centered in the active zone for biometric hashing.")
-                  : (lang === "kh" ? "រូបភាពជោគជ័យ។ ចុច 'រក្សាទុក' ដើម្បីភ្ជាប់ប្រព័ន្ធស្កែនមុខ។" : "Snapshot locked. Confirm connection registry below.")
-                }
-              </p>
-
-              {/* Controls */}
-              <div className="w-full flex gap-3">
-                {!photo ? (
-                  <button
-                    onClick={capturePhoto}
-                    className={`w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer ${
-                      isNightMode 
-                        ? "bg-amber-500 text-rose-955 hover:bg-amber-400" 
-                        : "bg-rose-800 text-white hover:bg-rose-900 shadow"
-                    }`}
-                  >
-                    <Camera size={14} />
-                    <span>{lang === "kh" ? "ចាប់យកទម្រង់មុខ" : "Scan & Save Frame"}</span>
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={startCamera}
-                      disabled={registering}
-                      className={`w-1/3 py-2.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                        isNightMode 
-                          ? "border-amber-500/20 bg-black text-amber-400 hover:bg-amber-500/10" 
-                          : "border-gray-250 bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {lang === "kh" ? "ថតឡើងវិញ" : "Retake"}
-                    </button>
-                    <button
-                      onClick={handleRegister}
-                      disabled={registering}
-                      className={`w-2/3 py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        isNightMode 
-                          ? "bg-amber-500 text-rose-955 hover:bg-amber-400" 
-                          : "bg-rose-800 text-white hover:bg-rose-900"
-                      }`}
-                    >
-                      <Sparkles size={13} className="animate-pulse" />
-                      <span>{registering ? (lang === "kh" ? "កំពុងភ្ជាប់..." : "Linking...") : (lang === "kh" ? "រក្សាទុកស្កែនមុខ" : "Confirm Link")}</span>
-                    </button>
-                  </>
-                )}
+                <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-ping" />
+                <span>
+                  {lang === "kh" ? `កម្រិតស្កែន៖ ${scanProgress}%` : `BIOMETRIC PROGRESS: ${scanProgress}%`}
+                </span>
               </div>
+
+              {/* Angle Direction Guide Cards (Center, Right, Left, Up, Down) */}
+              <div className="w-full space-y-2 mb-6">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">
+                  {lang === "kh" ? "ដំណាក់កាលស្វ័យប្រវត្តទាំង ៥ មុំ៖" : "Automated Biometric Directions:"}
+                </p>
+                <div className="grid grid-cols-5 gap-1">
+                  {steps.map((st) => {
+                    const isCompleted = scanProgress >= (st.id + 1) * 20;
+                    const isActive = activeStep === st.id;
+                    return (
+                      <div 
+                        key={st.id} 
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          isCompleted 
+                            ? (isNightMode ? "bg-amber-500/10 text-amber-400 border-amber-500/30 font-black scale-[0.98]" : "bg-emerald-50 text-emerald-800 border-emerald-100 font-bold scale-[0.98]")
+                            : isActive 
+                            ? (isNightMode ? "bg-rose-950/30 text-rose-300 border-rose-800 scale-102 ring-1 ring-amber-400/50 animate-pulse" : "bg-rose-100 text-rose-950 border-rose-400 scale-102 font-bold ring-2 ring-rose-200")
+                            : (isNightMode ? "bg-stone-950/20 text-stone-600 border-stone-900" : "bg-gray-50 text-gray-400 border-gray-100")
+                        }`}
+                        title={lang === "kh" ? st.textKh : st.textEn}
+                      >
+                        <div className="flex flex-col items-center justify-center">
+                          <span className="text-xs">
+                            {st.id === 0 ? "🎯" : st.id === 1 ? "➡️" : st.id === 2 ? "⬅️" : st.id === 3 ? "⬆️" : "⬇️"}
+                          </span>
+                          <span className="text-[8px] uppercase tracking-tighter mt-1 font-mono">
+                            {isCompleted ? "DONE" : isActive ? "SCAN" : "WAIT"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Live Instruction text bar */}
+                <div className={`p-3 rounded-xl border text-center text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  isNightMode ? "bg-black/60 border-amber-500/10 text-amber-200" : "bg-rose-50/50 border-rose-100 text-rose-950"
+                }`}>
+                  <Sparkles size={13} className="text-amber-500 animate-spin" />
+                  <span>
+                    {lang === "kh" 
+                      ? `សកម្មភាព៖ ${steps[activeStep].textKh}` 
+                      : `Instruction: ${steps[activeStep].textEn}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Retry action buttons only displayed on fail */}
+              {photo && error && (
+                <button
+                  onClick={startCamera}
+                  className={`w-full py-2.5 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+                    isNightMode ? "bg-amber-500 text-rose-955 hover:bg-amber-400" : "bg-rose-800 text-white hover:bg-rose-900"
+                  }`}
+                >
+                  <Camera size={14} />
+                  <span>{lang === "kh" ? "ស្កែនទម្រង់មុខឡើងវិញ" : "Restart Sweep Scan"}</span>
+                </button>
+              )}
             </div>
           )}
         </div>

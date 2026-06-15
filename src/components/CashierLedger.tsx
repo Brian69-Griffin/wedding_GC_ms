@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Plus, Search, SlidersHorizontal, ArrowUpDown, FileText, Download,
   Camera, Upload, Eye, CheckCircle2, DollarSign, RefreshCw, Trash2, Edit3,
-  Calendar, MapPin, Notebook, UserCheck, ShieldAlert, Sparkles, AlertCircle
+  Calendar, MapPin, Notebook, UserCheck, ShieldAlert, Sparkles, AlertCircle,
+  Printer
 } from "lucide-react";
 import { GiftRecord, QRCodeConfig } from "../types";
 import { Language, translations } from "../i18n";
@@ -588,13 +589,6 @@ export default function CashierLedger({
             <Camera size={14} />
             <span>{t.searchByFaceBtn}</span>
           </button>
-          <button
-            id="logout_header_btn"
-            onClick={confirmLogoutAction}
-            className="rounded-xl border border-gray-100 bg-white px-4 py-2.5 text-xs font-semibold text-gray-600 transition-all hover:bg-gray-50 hover:text-gray-900 active:scale-95 cursor-pointer"
-          >
-            {t.signOut}
-          </button>
         </div>
       </div>
 
@@ -988,8 +982,17 @@ export default function CashierLedger({
                 ))}
               </div>
 
-              {/* PDF & Excel exports */}
+              {/* PDF & Excel & Printing exports */}
               <div className="flex items-center gap-2 justify-end self-start">
+                <button
+                  id="print_ledger_button"
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-bold text-amber-900 hover:bg-amber-100 cursor-pointer shadow-sm select-none transition-all active:scale-95"
+                  title="Print custom wedding gift ledger folder directly"
+                >
+                  <Printer size={11} className="text-amber-700 animate-pulse" />
+                  <span>{lang === "kh" ? "បោះពុម្ពបញ្ជី" : "Print Ledger"}</span>
+                </button>
                 <button
                   id="export_pdf_button"
                   onClick={exportPDFLedger}
