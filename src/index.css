@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", Georgia, Cambria, serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  /* Rich, warm, ROMANTIC "Red Heart / Love Story" Theme Color Palette */
+  --color-rose-50: #fff5f5;      /* Warm romantic soft background */
+  --color-rose-100: #ffe3e3;     /* Delicately tinted borders */
+  --color-rose-200: #ffd0d0;     /* Highlighted separators */
+  --color-rose-500: #e03131;     /* Primary crimson love red */
+  --color-rose-600: #c92a2a;     /* Deeper crimson for actions */
+  --color-rose-700: #b01a1a;     /* Accent red highlights */
+  --color-rose-800: #961212;     /* Core buttons and headings */
+  --color-rose-850: #880e0e;     /* High branding saturation */
+  --color-rose-855: #730a0a;     /* High contrast luxury red text */
+  --color-rose-900: #5c0505;     /* Dark majestic maroon text and headers */
+  --color-rose-950: #3b0000;     /* Deep charcoal background tones */
+  --color-pink-200: #ff8787;     /* Soft warm highlight */
+  --color-emerald-850: #065f46;
+}
+
+/* Elegant micro enhancements */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(13%) sepia(85%) saturate(3940%) hue-rotate(336deg) contrast(100%);
+  cursor: pointer;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(80%) sepia(30%) saturate(3000%) hue-rotate(350deg) contrast(110%) !important;
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Remix: Wedding Cash Gift Management System",
+  "description": "Securely record, manage, and search wedding cash gifts. Features digital ledger, visual address grouping, QR code payment support, exports, and facial recognition search.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
