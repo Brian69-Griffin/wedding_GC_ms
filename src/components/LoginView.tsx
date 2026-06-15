@@ -30,64 +30,12 @@ export default function LoginView({
   const [faceScanning, setFaceScanning] = useState(false);
   const [faceError, setFaceError] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
-  const [faceScanProgress, setFaceScanProgress] = useState(0);
-  const [facePresent, setFacePresent] = useState(true);
+  const [cameraFacing, setCameraFacing] = useState<"user" | "environment">("user");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const facePresentRef = useRef(true);
 
   const t = translations[lang];
-
-  useEffect(() => {
-    facePresentRef.current = facePresent;
-  }, [facePresent]);
-
-  // Periodic Face Presence Detection Loop for Login
-  useEffect(() => {
-    let checkInterval: any = null;
-    if (faceModalOpen && cameraActive && !faceScanning && !facePhoto) {
-      checkInterval = setInterval(() => {
-        if (videoRef.current && videoRef.current.readyState >= 2) {
-          const isPresent = checkRealFacePresence(videoRef.current);
-          setFacePresent(isPresent);
-        }
-      }, 250);
-    } else {
-      setFacePresent(true);
-    }
-    return () => {
-      if (checkInterval) clearInterval(checkInterval);
-    };
-  }, [faceModalOpen, cameraActive, faceScanning, facePhoto]);
-
-  // Auto-sweep scanning execution when biometric view open
-  useEffect(() => {
-    let timer: any = null;
-    if (faceModalOpen && cameraActive && !faceScanning && !facePhoto) {
-      setFaceScanProgress(0);
-      timer = setInterval(() => {
-        setFaceScanProgress((prev) => {
-          // If face is NOT present, do NOT advance or progress scanning
-          if (!facePresentRef.current) {
-            return prev;
-          }
-          if (prev >= 100) {
-            clearInterval(timer);
-            // Grab the frame automatically on full sweep completion!
-            setTimeout(() => {
-              captureAndAuthenticateFace();
-            }, 100);
-            return 100;
-          }
-          return prev + 2; // Complete sweep in ~1.5 seconds
-        });
-      }, 30);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [faceModalOpen, cameraActive, faceScanning, facePhoto]);
 
   const handleSubmit = async (e: React.FormEvent, customUser?: string, customPass?: string) => {
     e?.preventDefault();
@@ -134,7 +82,7 @@ export default function LoginView({
     setTimeout(async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 400, height: 400, facingMode: "user" }
+          video: { width: 400, height: 400, facingMode: cameraFacing }
         });
         streamRef.current = stream;
         if (videoRef.current) {
@@ -152,6 +100,30 @@ export default function LoginView({
     }, 150);
   };
 
+  const toggleCameraFacing = async () => {
+    const nextFacing = cameraFacing === "user" ? "environment" : "user";
+    setCameraFacing(nextFacing);
+    if (cameraActive) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 400, height: 400, facingMode: nextFacing }
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      } catch (err) {
+        console.error("Camera switch failed:", err);
+        setFaceError("Failed to switch camera device.");
+      }
+    }
+  };
+
   const stopFaceCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -167,9 +139,10 @@ export default function LoginView({
       canvas.height = 360;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        // Capture with mirror inversion for realistic preview
-        ctx.scale(-1, 1);
-        ctx.translate(-360, 0);
+        if (cameraFacing === "user") {
+          ctx.scale(-1, 1);
+          ctx.translate(-360, 0);
+        }
         ctx.drawImage(videoRef.current, 0, 0, 360, 360);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.85); // Compress JPEG for efficient bandwidth
         setFacePhoto(dataUrl);
@@ -379,7 +352,7 @@ export default function LoginView({
               onClick={startFaceLogin}
               className={`w-full rounded-xl py-2.5 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2 border shadow-sm ${
                 isNightMode 
-                  ? "bg-black border-amber-500/20 text-amber-400 hover:bg-amber-500/10 shadow-amber-950/5" 
+                  ? "bg-black border-amber-500/20 text-amber-400 hover:bg-amber-500/10 shadow-amber-955/5" 
                   : "bg-rose-50 border-rose-100 text-rose-800 hover:bg-rose-100/60"
               }`}
             >
@@ -402,7 +375,7 @@ export default function LoginView({
               isNightMode ? "bg-stone-955 border-b border-amber-500/10" : "bg-gradient-to-r from-rose-800 to-rose-955"
             }`}>
               <div className="flex items-center gap-2">
-                <Shield className="text-amber-400 animate-pulse" size={16} />
+                <Shield className="text-amber-400" size={16} />
                 <span className="font-serif text-xs font-bold tracking-wide">
                   {lang === "kh" ? "ស្កែនទម្រង់មុខជីវមាត្រ" : "Biometric Face Authentication"}
                 </span>
@@ -426,44 +399,11 @@ export default function LoginView({
               )}
 
               {/* Secure Scanning viewport */}
-              <div className="relative w-56 h-56 mx-auto mb-5 flex items-center justify-center rounded-full overflow-hidden bg-black border border-gray-800">
-                
-                {/* Visual circular progress meter */}
-                <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-                  <svg className="w-52 h-52 absolute transform -rotate-90">
-                    <circle
-                      cx="104"
-                      cy="104"
-                      r="90"
-                      stroke={isNightMode ? "rgba(245,158,11,0.06)" : "rgba(159,18,57,0.04)"}
-                      strokeWidth="4"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="104"
-                      cy="104"
-                      r="90"
-                      stroke={isNightMode ? "#fbbf24" : "#9f1239"}
-                      strokeWidth="5"
-                      fill="transparent"
-                      strokeDasharray={2 * Math.PI * 90}
-                      strokeDashoffset={2 * Math.PI * 90 * (1 - faceScanProgress / 100)}
-                      className="transition-all duration-75"
-                    />
-                  </svg>
-                  
-                  {/* Glowing laser line swept down */}
-                  <div className={`absolute left-4 right-4 h-0.5 animate-[bounce_2s_infinite] shadow ${
-                    isNightMode 
-                      ? "bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-amber-400/60" 
-                      : "bg-gradient-to-r from-transparent via-rose-550 to-transparent shadow-rose-500/65"
-                  }`} />
-                </div>
-
+              <div className="relative w-52 h-52 mx-auto mb-5 flex items-center justify-center rounded-2xl overflow-hidden bg-black border border-gray-800 shadow-inner">
                 {cameraActive ? (
                   <video 
                     ref={videoRef} 
-                    className="w-full h-full object-cover scale-x-[-1]" 
+                    className={`w-full h-full object-cover ${cameraFacing === "user" ? "scale-x-[-1]" : ""}`} 
                     playsInline 
                     autoPlay
                   />
@@ -471,43 +411,64 @@ export default function LoginView({
                   <img 
                     src={facePhoto} 
                     alt="Captured biometric" 
-                    className="w-full h-full object-cover scale-x-[-1]" 
+                    className="w-full h-full object-cover" 
                   />
                 ) : (
-                  <div className="text-gray-650 flex flex-col items-center">
-                    <Camera size={36} className="animate-pulse" />
+                  <div className="text-gray-655 flex flex-col items-center">
+                    <Camera size={36} className="text-rose-200" />
+                  </div>
+                )}
+                
+                {faceScanning && (
+                  <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center text-center p-3">
+                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-amber-400 border-t-transparent mb-2"></div>
+                    <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">
+                      {lang === "kh" ? "កំពុងវិភាគមុខ..." : "Verifying Biometrics..."}
+                    </p>
                   </div>
                 )}
               </div>
 
-              {/* Biometric Scan status pill */}
-              <div className={`mb-4 px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase flex items-center gap-1.5 ${
-                !facePresent
-                  ? "bg-red-955/40 text-red-400 border border-red-900/30 animate-pulse"
-                  : isNightMode 
-                  ? "bg-amber-955/52 border border-amber-500/10 text-amber-300 animate-pulse" 
-                  : "bg-rose-50 border border-rose-100 text-rose-900"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${!facePresent ? "bg-red-500 animate-pulse" : "bg-emerald-600 animate-ping"}`} />
-                <span>
-                  {!facePresent
-                    ? (lang === "kh" ? "ការស្កែនផ្អាក" : "SCAN PAUSED")
-                    : (lang === "kh" ? `កម្រិតស្កែន៖ ${faceScanProgress}%` : `BIOMETRIC PROGRESS: ${faceScanProgress}%`)}
-                </span>
-              </div>
+              {cameraActive && !faceScanning && (
+                <div className="w-full flex gap-2 mb-5 justify-center">
+                  <button
+                    type="button"
+                    onClick={captureAndAuthenticateFace}
+                    className="flex-1 py-2 text-xs font-bold text-white bg-rose-800 hover:bg-rose-900 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow active:scale-95 transition-all"
+                  >
+                    <Camera size={13} />
+                    {lang === "kh" ? "ថតរូប និងចូល" : "Capture & Login"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleCameraFacing}
+                    className={`px-3 py-2 text-xs font-bold rounded-xl border cursor-pointer active:scale-95 transition-all ${
+                      isNightMode ? "bg-stone-900 text-amber-400 border-amber-500/20" : "bg-white text-gray-750 border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {lang === "kh" ? "ប្តូរ" : "🔄 Switch"}
+                  </button>
+                </div>
+              )}
 
-              <p className={`text-center text-xs font-semibold mb-6 max-w-xs ${
-                !facePresent ? "text-red-500 animate-pulse" : isNightMode ? "text-amber-200/90" : "text-rose-955"
+              {facePhoto && !faceScanning && (
+                <button
+                  type="button"
+                  onClick={startFaceLogin}
+                  className={`w-full py-2.5 text-xs font-bold rounded-xl mb-5 cursor-pointer active:scale-95 transition-all text-center ${
+                    isNightMode ? "bg-stone-900 text-amber-400 border border-amber-500/20" : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {lang === "kh" ? "ព្យាយាមម្តងទៀត" : "Retry Capture"}
+                </button>
+              )}
+
+              <p className={`text-center text-xs ml-1 mr-1 mb-6 max-w-xs ${
+                isNightMode ? "text-amber-200/90" : "text-gray-500"
               }`}>
-                {!facePresent
-                  ? (lang === "kh" ? "⚠️ សូមដាក់ផ្ទៃមុខចូលក្នុងកាមេរ៉ា ដើម្បីបន្តការស្កែន" : "⚠️ Please position your face inside the focal ring to scan")
-                  : faceScanning 
+                {faceScanning 
                   ? (lang === "kh" ? "📡 ម៉ាស៊ីនបម្រើកំពុងផ្ទៀងផ្ទាត់ទិន្នន័យ..." : "📡 Matchmaking biometric registry keys...") 
-                  : faceScanProgress < 30 
-                  ? (lang === "kh" ? "🔍 កំពុងតម្រង់ទម្រង់ផ្ទៃមុខ..." : "🔍 Tracking facial profile dimensions...")
-                  : faceScanProgress < 70 
-                  ? (lang === "kh" ? "🔒 កំពុងវិភាគកូអរដោណេភ្នែក..." : "🔒 Comparing ocular feature positions...")
-                  : (lang === "kh" ? "✨ ស្ទើរតែរួចរាល់ហើយ! កំពុងផ្ទៀងផ្ទាត់..." : "✨ Almost completed! Finalizing handshake...")
+                  : (lang === "kh" ? "🔍 សូមតម្រង់មុខរបស់អ្នកចំកាមេរ៉ា រួចចុចប៊ូតុងថត" : "🔍 Point camera directly at your face and click capture")
                 }
               </p>
 
@@ -519,7 +480,7 @@ export default function LoginView({
                   className={`w-full py-2.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                     isNightMode 
                       ? "border-amber-500/10 bg-black text-amber-400 hover:bg-amber-500/5" 
-                      : "border-gray-250 bg-white text-gray-700 hover:bg-gray-50"
+                      : "border-gray-250 bg-white text-gray-700 hover:bg-gray-54"
                   }`}
                 >
                   {lang === "kh" ? "បោះបង់" : "Cancel Scan"}
@@ -531,98 +492,4 @@ export default function LoginView({
       )}
     </div>
   );
-}
-
-// Fast real-time computer vision presence analyzer for face scanning
-function checkRealFacePresence(video: HTMLVideoElement): boolean {
-  try {
-    const canvas = document.createElement("canvas");
-    canvas.width = 30;
-    canvas.height = 30;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return true;
-
-    ctx.drawImage(video, 0, 0, 30, 30);
-    const imgData = ctx.getImageData(0, 0, 30, 30);
-    const data = imgData.data;
-
-    let totalR = 0;
-    let totalG = 0;
-    let totalB = 0;
-
-    let centerSkinPixels = 0;
-    let centerTotalPixels = 0;
-    let outerSkinPixels = 0;
-    let outerTotalPixels = 0;
-
-    // Monitor luminance variation to reject flat backgrounds
-    let minLuminance = 255;
-    let maxLuminance = 0;
-
-    for (let y = 0; y < 30; y++) {
-      for (let x = 0; x < 30; x++) {
-        const i = (y * 30 + x) * 4;
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-
-        totalR += r;
-        totalG += g;
-        totalB += b;
-
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-        if (luminance < minLuminance) minLuminance = luminance;
-        if (luminance > maxLuminance) maxLuminance = luminance;
-
-        // Classify skin tones in various ethnical profiles
-        const isSkin = r > 65 && g > 45 && b > 25 && r > g && r > b && (r - g) > 8;
-
-        // Center region represents the camera center aligned with the scanning overlay circle (X: 7..22, Y: 7..22)
-        const isCenter = x >= 7 && x <= 22 && y >= 7 && y <= 22;
-
-        if (isCenter) {
-          centerTotalPixels++;
-          if (isSkin) centerSkinPixels++;
-        } else {
-          outerTotalPixels++;
-          if (isSkin) outerSkinPixels++;
-        }
-      }
-    }
-
-    const count = data.length / 4;
-    const avgR = totalR / count;
-    const avgG = totalG / count;
-    const avgB = totalB / count;
-
-    const centerSkinRatio = centerSkinPixels / centerTotalPixels;
-    const outerSkinRatio = outerSkinPixels / outerTotalPixels;
-
-    // 1. Check if camera is covered (extremely low illumination or pitch dark)
-    if (avgR < 25 && avgG < 25 && avgB < 25) {
-      return false;
-    }
-
-    // 2. Reject flat, uniform surfaces (e.g. ceilings, flat sheets, plain light walls with zero shadows/features)
-    // A genuine face of a user has deep-contrast textures from eyelashes, eyes, nostrils, and hair
-    if (maxLuminance - minLuminance < 35) {
-      return false;
-    }
-
-    // 3. Central focus constraint (the user's physical face must cover the scanner ring area in the center)
-    if (centerSkinRatio < 0.15) {
-      return false;
-    }
-
-    // 4. Uniform background skin-tone rejection (e.g. warm wooden door frame, cabinetry, uniform beige wall)
-    // In a flat background, skin pixels are uniformly spread out (similar ratio in inner vs outer regions).
-    // In contrast, a centered face creates a notable spike/concentration in the focal center ring.
-    if (outerSkinRatio > 0.15 && centerSkinRatio < outerSkinRatio * 1.15) {
-      return false;
-    }
-
-    return true;
-  } catch (err) {
-    return true; // failure safe to avoid blocking client
-  }
 }

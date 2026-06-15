@@ -198,8 +198,10 @@ export default function App() {
     }
 
     // Wedding Couple / Recorder Controls
+    const isFaceConnected = !!currentUser?.faceLoginImage;
+
     return (
-      <div className={`min-h-screen transition-all duration-300 ${isNightMode ? "bg-gradient-to-br from-[#0c0000] via-[#1c0202] to-[#2b0303] text-gray-100" : "bg-gray-50/50 text-gray-900"}`}>
+      <div className={`min-h-screen transition-all duration-300 ${isNightMode ? "bg-gradient-to-br from-[#0c0000] via-[#1c0202] to-[#2b0303] text-gray-100" : "bg-gray-50/50 text-gray-950"}`}>
         {/* Navigation Head Rail */}
         <header className={`sticky top-0 z-40 w-full border-b transition-all duration-300 ${
           isNightMode 
@@ -306,14 +308,26 @@ export default function App() {
                   id="connect_face_header_btn"
                   onClick={() => setIsConnectFaceOpen(true)}
                   className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold border transition-all select-none active:scale-95 cursor-pointer ${
-                    isNightMode 
-                      ? "bg-amber-550/25 text-amber-400 border-amber-500/20 hover:bg-amber-950/40 shadow-sm" 
-                      : "bg-rose-50 text-rose-800 border-rose-101 hover:bg-rose-100/60 shadow-sm"
+                    isFaceConnected
+                      ? isNightMode
+                        ? "bg-emerald-950/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-950/40 shadow-sm"
+                        : "bg-emerald-50 text-emerald-800 border-emerald-250 hover:bg-emerald-100 shadow-sm"
+                      : isNightMode
+                      ? "bg-red-950/20 text-red-400 border-red-500/30 hover:bg-red-950/40 shadow-sm"
+                      : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 shadow-sm"
                   }`}
-                  title={lang === "kh" ? "ស្កែនទម្រង់មុខដើម្បីចូលគណនីពេលក្រោយ" : "Click to establish face login biometrics"}
+                  title={
+                    isFaceConnected
+                      ? (lang === "kh" ? "បានភ្ជាប់ជីវមាត្រផ្ទៃមុខរួចរាល់" : "Biometrics face login is fully active")
+                      : (lang === "kh" ? "សូមភ្ជាប់ស្កែនមុខដើម្បីសុវត្ថិភាព" : "Click to connect face biometrics")
+                  }
                 >
-                  <Shield size={12} className="text-amber-450 animate-pulse" />
-                  <span>{lang === "kh" ? "ភ្ជាប់ស្កែនមុខ" : "Connect Face"}</span>
+                  <Shield size={12} className={isFaceConnected ? "text-emerald-500" : "text-red-500 animate-pulse"} />
+                  <span>
+                    {isFaceConnected
+                      ? (lang === "kh" ? "ភ្ជាប់ផ្ទៃមុខរួចរាល់" : "Face Connected")
+                      : (lang === "kh" ? "មិនទាន់ភ្ជាប់មុខ" : "Not Connected")}
+                  </span>
                 </button>
                 <button
                   id="quick_sign_out_btn"
@@ -460,13 +474,21 @@ export default function App() {
                       setMobileMenuOpen(false);
                     }}
                     className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border transition-all cursor-pointer ${
-                      isNightMode 
-                        ? "bg-amber-955/20 text-amber-400 border-amber-500/15 hover:bg-amber-950" 
-                        : "bg-rose-50 text-rose-800 border-rose-101 hover:bg-rose-100/40"
+                      isFaceConnected
+                        ? isNightMode
+                          ? "bg-emerald-955/20 text-emerald-400 border-emerald-500/25 hover:bg-emerald-950"
+                          : "bg-emerald-50 text-emerald-800 border-emerald-101 hover:bg-emerald-100/50"
+                        : isNightMode
+                        ? "bg-red-955/20 text-red-400 border-red-500/25 hover:bg-red-950"
+                        : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100/40"
                     }`}
                   >
-                    <Shield size={14} className="text-amber-450 animate-pulse" />
-                    <span>{lang === "kh" ? "ភ្ជាប់ស្កែនមុខ" : "Connect Face Login"}</span>
+                    <Shield size={14} className={isFaceConnected ? "text-emerald-400" : "text-red-500 animate-pulse"} />
+                    <span>
+                      {isFaceConnected
+                        ? (lang === "kh" ? "ភ្ជាប់ផ្ទៃមុខរួចរាល់" : "Face Connected")
+                        : (lang === "kh" ? "មិនទាន់ភ្ជាប់មុខ" : "Not Connected")}
+                    </span>
                   </button>
 
                   {/* Sign Out */}
@@ -547,6 +569,13 @@ export default function App() {
             activeWeddingId={currentUser.weddingId!}
             lang={lang}
             isNightMode={isNightMode}
+            onFaceRegistered={(faceImage) => {
+              if (currentUser) {
+                const updatedUser = { ...currentUser, faceLoginImage: faceImage };
+                setCurrentUser(updatedUser);
+                localStorage.setItem("wedding_gift_session", JSON.stringify(updatedUser));
+              }
+            }}
           />
         )}
       </div>

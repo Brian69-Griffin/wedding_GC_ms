@@ -393,12 +393,12 @@ async function initializeDatabase() {
       await client.query(`
         UPDATE weddings 
         SET password = 'couple123', avatar_seed = 'rose' 
-        WHERE username = 'couple' AND (password IS NULL OR password = '')
+        WHERE LOWER(TRIM(username)) = 'couple' AND (password IS NULL OR password = '')
       `);
       await client.query(`
         UPDATE weddings 
         SET password = 'password', avatar_seed = 'gold' 
-        WHERE username = 'rath' AND (password IS NULL OR password = '')
+        WHERE LOWER(TRIM(username)) = 'rath' AND (password IS NULL OR password = '')
       `);
     }
 
@@ -501,6 +501,7 @@ app.post("/api/auth/login", async (req, res) => {
         username: foundWedding.username,
         weddingName: foundWedding.weddingName,
         profilePicture: foundWedding.profilePicture,
+        faceLoginImage: foundWedding.faceLoginImage || null,
       });
     }
   } catch (err: any) {
@@ -586,6 +587,7 @@ app.post("/api/auth/login-by-face", async (req, res) => {
         username: luckyMatch.username,
         weddingName: luckyMatch.weddingName,
         profilePicture: luckyMatch.profilePicture,
+        faceLoginImage: luckyMatch.faceLoginImage || null,
         message: "Biometrics verified successfully (development bypass active)"
       });
     }
@@ -669,6 +671,7 @@ app.post("/api/auth/login-by-face", async (req, res) => {
           username: matchedWedding.username,
           weddingName: matchedWedding.weddingName,
           profilePicture: matchedWedding.profilePicture,
+          faceLoginImage: matchedWedding.faceLoginImage || null,
           message: "Biometrics verified"
         });
       }

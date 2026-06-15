@@ -6,6 +6,7 @@ export interface SecurityUser {
   weddingName: string;
   profilePicture?: string;
   password?: string;
+  faceLoginImage?: string;
 }
 
 export interface GiftRecord {
