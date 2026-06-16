@@ -92,16 +92,16 @@ export default function ConnectFaceModal({
   const captureManualPhoto = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
-      canvas.width = 380;
-      canvas.height = 380;
+      canvas.width = 240;
+      canvas.height = 240;
       const ctx = canvas.getContext("2d");
       if (ctx) {
         if (cameraFacing === "user") {
           ctx.scale(-1, 1);
-          ctx.translate(-380, 0);
+          ctx.translate(-240, 0);
         }
-        ctx.drawImage(videoRef.current, 0, 0, 380, 380);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.90);
+        ctx.drawImage(videoRef.current, 0, 0, 240, 240);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.75); // Compressed JPEG template for high-speed transmission
         setPhoto(dataUrl);
         stopCamera();
       }
@@ -117,7 +117,7 @@ export default function ConnectFaceModal({
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const MAX_SIZE = 380;
+          const MAX_SIZE = 240; // Smaller biometric size targets
           let w = img.width;
           let h = img.height;
           if (w > h) {
@@ -135,7 +135,7 @@ export default function ConnectFaceModal({
           canvas.height = h;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
           setPhoto(dataUrl);
         };
         img.src = event.target?.result as string;

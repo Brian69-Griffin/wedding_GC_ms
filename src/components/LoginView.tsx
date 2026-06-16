@@ -135,16 +135,16 @@ export default function LoginView({
   const captureAndAuthenticateFace = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
-      canvas.width = 260;
-      canvas.height = 260;
+      canvas.width = 200;
+      canvas.height = 200;
       const ctx = canvas.getContext("2d");
       if (ctx) {
         if (cameraFacing === "user") {
           ctx.scale(-1, 1);
-          ctx.translate(-260, 0);
+          ctx.translate(-200, 0);
         }
-        ctx.drawImage(videoRef.current, 0, 0, 260, 260);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.75); // Lighter payload for split-second processing
+        ctx.drawImage(videoRef.current, 0, 0, 200, 200);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.70); // Super-light target image layout
         setFacePhoto(dataUrl);
         stopFaceCamera();
         
@@ -162,7 +162,7 @@ export default function LoginView({
       const response = await fetch("/api/auth/login-by-face", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ faceImage: photoData }),
+        body: JSON.stringify({ faceImage: photoData, username: username.trim() }),
       });
 
       const data = await response.json();
